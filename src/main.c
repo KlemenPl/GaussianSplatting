@@ -34,7 +34,7 @@ typedef struct SortUniform {
 _Static_assert(sizeof(SortUniform) == 16, "");
 _Static_assert(offsetof(SortUniform, comparePattern) == 0, "");
 
-OrbitCamera camera = ORBIT_CAMERA_DEFAULT;
+ArcballCamera camera = CAMERA_ARCBALL_DEFAULT;
 
 uint32_t numSplats;
 
@@ -367,16 +367,17 @@ void render(const AppState *app, float dt) {
         vec2 mouseDelta;
         inputGetMouseDelta(mouseDelta);
         glm_vec2_scale(mouseDelta, mouseSpeed * dt, mouseDelta);
-        orbitCameraMove(&camera, mouseDelta[0], mouseDelta[1]);
+
+        arcballCameraRotate(&camera, mouseDelta);
     }
     //orbitCameraMove(&camera, 100 * dt, 0);
     vec2 wheelDelta;
     inputGetMouseWheelDelta(wheelDelta);
     if (wheelDelta[1] != 0.0) {
-        camera.distance -= wheelDelta[1] * 0.2f;
+        arcballCameraZoom(&camera, -wheelDelta[1] * 0.2f);
     }
 
-    orbitCameraUpdate(&camera);
+    arcballCameraUpdate(&camera);
 
     //glm_mat4_identity(camera.proj);
     //glm_mat4_transpose(camera.viewProj);
