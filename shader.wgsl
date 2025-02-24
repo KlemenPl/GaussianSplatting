@@ -7,10 +7,11 @@ struct Splat {
 
 struct VertexOutput {
     @builtin(position) pos: vec4f,
-    @location(0) center: vec4f,
+    @location(0) offset: vec2f,
     @location(1) scale: vec3f,
-    @location(2) color: u32,
-    @location(3) rotation: u32,
+    @location(2) depth: f32,
+    @location(3) color: u32,
+    @location(4) rotation: u32,
 }
 
 struct Uniforms {
@@ -82,8 +83,9 @@ fn vs_main(
 
     var out: VertexOutput;
     out.pos = pos + vec4f(quad[vIdx] * (s / z), 0.0, 0.0);
-    out.center = pos;
+    out.offset = pos.xy - out.pos.xy;
     out.scale = splat.scale;
+    out.depth = z / s;
     out.color = splat.color;
     out.rotation = splat.rotation;
     //out.pos.w = 0.0;
@@ -98,5 +100,11 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
     let a = f32((in.color >> 24) & 0xff) / 255.0f;
     let color = vec4f(r, g, b, a);
 
-    return vec4f(color.rgb * a, a);
+    let offset = sqrt(dot(in.offset, in.offset));
+    let sigma = in.depth; // s / z
+    let gaus = exp(-0.5 * offset * offset * sigma);
+    let finalAlpha = gaus * a;
+
+
+    return vec4f(color.rgb * finalAlpha, finalAlpha);
 }

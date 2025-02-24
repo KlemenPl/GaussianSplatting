@@ -366,7 +366,8 @@ void render(const AppState *app, float dt) {
         const float mouseSpeed = 10.0f;
         vec2 mouseDelta;
         inputGetMouseDelta(mouseDelta);
-        glm_vec2_scale(mouseDelta, - mouseSpeed * dt, mouseDelta);
+        glm_vec2_scale(mouseDelta, mouseSpeed * dt, mouseDelta);
+        mouseDelta[1] = - mouseDelta[1];
 
         arcballCameraRotate(&camera, mouseDelta);
     }
@@ -523,7 +524,7 @@ void render(const AppState *app, float dt) {
     wgpuCommandEncoderRelease(encoder);
 
 
-#if 1
+#if 0
 
     size_t posSize = wgpuBufferGetSize(transformedPosBuffer);
     size_t indicesSize = wgpuBufferGetSize(sortedIndexBuffer);
