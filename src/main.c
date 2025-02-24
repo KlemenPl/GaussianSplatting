@@ -330,7 +330,7 @@ void mapBuffer(WGPUBufferMapAsyncStatus status, void *userData) {
         uint32_t j = indices[i - 1];
         uint32_t k = indices[i];
         //assert(positions[i - 1][2] <= positions[i][2]);
-        assert(positions[j][2] <= positions[k][2]);
+        assert(positions[j][2] >= positions[k][2]);
     }
 
     wgpuBufferUnmap(stagingBuffer);

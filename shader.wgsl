@@ -46,7 +46,7 @@ fn sort_cmp_and_swap(i: u32, j: u32) {
     }
     let iIdx = sorted[i];
     let jIdx = sorted[j];
-    if (i < j && transformedPos[jIdx].z < transformedPos[iIdx].z) {
+    if (i < j && transformedPos[iIdx].z < transformedPos[jIdx].z) {
         let tmp = sorted[i];
         sorted[i] = sorted[j];
         sorted[j] = tmp;
