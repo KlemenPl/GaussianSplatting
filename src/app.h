@@ -165,12 +165,14 @@ int main(int argc, const char **argv) {
         fprintf(stderr, "Failed to initialize application!\n");
     }
 
-
+    char titleBuf[256];
     float prevFrame = 0.0f;
     float currFrame = 0.0f;
     while (!glfwWindowShouldClose(window)) {
         // TODO: Accum for fixed update
         float deltaTime = currFrame - prevFrame;
+        snprintf(titleBuf, sizeof(titleBuf), "%s [%.2f FPS | %.2f ms]", config.title, 1 / deltaTime, deltaTime * 1000.0f);
+        glfwSetWindowTitle(window, titleBuf);
         inputUpdate();
         glfwPollEvents();
 
