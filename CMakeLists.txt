@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.30)
-project(GuassianSplatting)
+project(GaussianSplatting)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -21,7 +21,7 @@ else ()
     add_subdirectory(glfw3)
 endif ()
 
-add_executable(GuassianSplatting
+add_executable(GaussianSplatting
         src/app.h
         src/camera.h
         src/input.c
@@ -33,10 +33,10 @@ add_executable(GuassianSplatting
         src/wgpu-utils.h
 )
 
-target_link_libraries(GuassianSplatting PRIVATE webgpu cglm glfw glfw3webgpu)
-target_copy_webgpu_binaries(GuassianSplatting)
+target_link_libraries(GaussianSplatting PRIVATE webgpu cglm glfw glfw3webgpu)
+target_copy_webgpu_binaries(GaussianSplatting)
 
 if (EMSCRIPTEN)
     # Generate a full web page rather than a simple WebAssembly module
-    set_target_properties(GuassianSplatting PROPERTIES SUFFIX ".html")
+    set_target_properties(GaussianSplatting PROPERTIES SUFFIX ".html")
 endif()
