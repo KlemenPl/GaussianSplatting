@@ -371,17 +371,13 @@ void render(const AppState *app, float dt) {
 
         arcballCameraRotate(&camera, mouseDelta);
     }
-    //orbitCameraMove(&camera, 100 * dt, 0);
     vec2 wheelDelta;
     inputGetMouseWheelDelta(wheelDelta);
     if (wheelDelta[1] != 0.0) {
         arcballCameraZoom(&camera, -wheelDelta[1] * 0.2f);
     }
-
     arcballCameraUpdate(&camera);
 
-    //glm_mat4_identity(camera.proj);
-    //glm_mat4_transpose(camera.viewProj);
     Uniform uniform = {
         .scale = 0.025f,
     };
