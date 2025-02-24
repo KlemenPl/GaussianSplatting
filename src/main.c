@@ -366,7 +366,7 @@ void render(const AppState *app, float dt) {
         const float mouseSpeed = 10.0f;
         vec2 mouseDelta;
         inputGetMouseDelta(mouseDelta);
-        glm_vec2_scale(mouseDelta, mouseSpeed * dt, mouseDelta);
+        glm_vec2_scale(mouseDelta, - mouseSpeed * dt, mouseDelta);
 
         arcballCameraRotate(&camera, mouseDelta);
     }

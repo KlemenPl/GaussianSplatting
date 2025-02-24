@@ -77,9 +77,11 @@ fn vs_main(
     let sIdx = sorted[iIdx];
     let splat = splats[sIdx];
     let pos = transformedPos[sIdx];
+    let s = uniforms.scale;
+    let z = pos.z;
 
     var out: VertexOutput;
-    out.pos = pos + vec4f(quad[vIdx] * uniforms.scale, 0.0, 0.0);
+    out.pos = pos + vec4f(quad[vIdx] * (s / z), 0.0, 0.0);
     out.center = pos;
     out.scale = splat.scale;
     out.color = splat.color;
