@@ -7,9 +7,9 @@ struct Splat {
 
 struct VertexOutput {
     @builtin(position) pos: vec4f,
-    @location(0) offset: vec2f,
+    @location(0) @interpolate(perspective) offset: vec2f,
     @location(1) scale: vec3f,
-    @location(2) depth: f32,
+    @location(2) @interpolate(flat) depth: f32,
     @location(3) color: u32,
     @location(4) rotation: u32,
 }
@@ -83,9 +83,10 @@ fn vs_main(
 
     var out: VertexOutput;
     out.pos = pos + vec4f(quad[vIdx] * (s / z), 0.0, 0.0);
-    out.offset = pos.xy - out.pos.xy;
+    out.offset = quad[vIdx];
+    //out.offset = quad[vIdx] * (s / z);
     out.scale = splat.scale;
-    out.depth = z / s;
+    out.depth = s / z;
     out.color = splat.color;
     out.rotation = splat.rotation;
     //out.pos.w = 0.0;
@@ -101,10 +102,11 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
     let color = vec4f(r, g, b, a);
 
     let offset = sqrt(dot(in.offset, in.offset));
-    let sigma = in.depth; // s / z
+    let sigma = 1 / in.depth; // (s / z) ^ (-1)
     let gaus = exp(-0.5 * offset * offset * sigma);
     let finalAlpha = gaus * a;
 
 
-    return vec4f(color.rgb * finalAlpha, finalAlpha);
+    return vec4f(color.rgb * finalAlpha,  finalAlpha);
+    //return vec4(abs(in.offset.x), 0, 0, 1);
 }

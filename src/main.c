@@ -379,7 +379,7 @@ void render(const AppState *app, float dt) {
     arcballCameraUpdate(&camera);
 
     Uniform uniform = {
-        .scale = 0.025f,
+        .scale = 0.125f,
     };
     glm_mat4_copy(camera.viewProj, uniform.viewProj);
 
