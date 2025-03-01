@@ -4,7 +4,6 @@ project(webgpu-backend-wgpu VERSION 1.0.0)
 message(STATUS "Using wgpu-native backend for WebGPU")
 
 if (EMSCRIPTEN)
-
 	add_library(webgpu INTERFACE)
 
 	target_include_directories(webgpu INTERFACE
@@ -39,7 +38,6 @@ else (EMSCRIPTEN)
 	target_compile_definitions(webgpu INTERFACE WEBGPU_BACKEND_WGPU)
 
 	if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
-
 		set(WGPU_RUNTIME_LIB ${WGPU}/bin/windows-${ARCH}/wgpu_native.dll)
 		set_target_properties(
 			webgpu
