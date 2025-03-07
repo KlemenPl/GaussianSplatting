@@ -22,8 +22,8 @@ typedef struct RequestDeviceData {
     bool requestEnded;
 } RequestDeviceData;
 
-void requestAdapterCB(WGPURequestAdapterStatus status, WGPUAdapter adapter, char const *message, void *userdata) {
-    RequestAdapterData *data = userdata;
+void requestAdapterCB(WGPURequestAdapterStatus status, WGPUAdapter adapter, WGPUStringView message, void *userdata1, void *userdata2) {
+    RequestAdapterData *data = userdata1;
     if (status == WGPURequestAdapterStatus_Success) {
         data->adapter = adapter;
     } else {
@@ -34,7 +34,10 @@ void requestAdapterCB(WGPURequestAdapterStatus status, WGPUAdapter adapter, char
 }
 WGPUAdapter requestAdapter(WGPUInstance instance, const WGPURequestAdapterOptions *opts) {
     RequestAdapterData data;
-    wgpuInstanceRequestAdapter(instance, opts, requestAdapterCB, &data);
+    wgpuInstanceRequestAdapter(instance, opts, (WGPURequestAdapterCallbackInfo){
+        .callback = requestAdapterCB,
+        .userdata1 = &data
+    });
 
 #ifdef __EMSCRIPTEN__
     while (!data.requestEnded) {
@@ -46,8 +49,8 @@ WGPUAdapter requestAdapter(WGPUInstance instance, const WGPURequestAdapterOption
     return data.adapter;
 }
 
-void requestDeviceCB(WGPURequestDeviceStatus status, WGPUDevice device, char const *message, void *userdata) {
-    RequestDeviceData *data = userdata;
+void requestDeviceCB(WGPURequestDeviceStatus status, WGPUDevice device, WGPUStringView message, void *userdata1, void *userdata2) {
+    RequestDeviceData *data = userdata1;
     if (status == WGPURequestDeviceStatus_Success) {
         data->device = device;
     } else {
@@ -59,7 +62,10 @@ void requestDeviceCB(WGPURequestDeviceStatus status, WGPUDevice device, char con
 
 WGPUDevice requestDevice(WGPUAdapter adapter, const WGPUDeviceDescriptor *desc) {
     RequestDeviceData data;
-    wgpuAdapterRequestDevice(adapter, desc, requestDeviceCB, &data);
+    wgpuAdapterRequestDevice(adapter, desc, (WGPURequestDeviceCallbackInfo){
+        .callback = requestDeviceCB,
+        .userdata1 = &data
+    });
 
 #ifdef __EMSCRIPTEN__
     while (!data.requestEnded) {
@@ -70,61 +76,3 @@ WGPUDevice requestDevice(WGPUAdapter adapter, const WGPUDeviceDescriptor *desc) 
     assert(data.requestEnded);
     return data.device;
 }
-
-void inspectAdapter(WGPUAdapter adapter) {
-    WGPUSupportedLimits supportedLimits = {.nextInChain = NULL};
-
-    WGPUBool success = wgpuAdapterGetLimits(adapter, &supportedLimits);
-    if (success) {
-        WGPULimits *const limits = &supportedLimits.limits;
-        printf("Adapter limits:\n");
-        printf("\tmaxTextureDimension1D: %d\n", limits->maxTextureDimension1D);
-        printf("\tmaxTextureDimension2D: %d\n", limits->maxTextureDimension2D);
-        printf("\tmaxTextureDimension3D: %d\n", limits->maxTextureDimension3D);
-        printf("\tmaxTextureArrayLayers: %d\n", limits->maxTextureArrayLayers);
-    }
-
-    size_t featureCount = wgpuAdapterEnumerateFeatures(adapter, NULL);
-    WGPUFeatureName features[featureCount];
-    wgpuAdapterEnumerateFeatures(adapter, features);
-
-    printf("Adapter features:\n");
-    for (size_t i = 0; i < featureCount; i++) {
-        printf("\t0x%0x\n", features[i]);
-    }
-
-    WGPUAdapterProperties properties = {.nextInChain = NULL};
-    wgpuAdapterGetProperties(adapter, &properties);
-    printf("Adapter properties:\n");
-    printf("\tVendorID: %d\n", properties.vendorID);
-    printf("\tDeviceID: %d\n", properties.deviceID);
-    printf("\tArchitecture: %s\n", properties.architecture);
-    printf("\tName: %s\n", properties.name ? properties.name : "");
-    printf("\tDriverDesc: %s\n", properties.driverDescription ? properties.driverDescription : "");
-    printf("\tAdapterType: 0x%0x\n", properties.adapterType);
-    printf("\tBackendType: 0x%0x\n", properties.backendType);
-}
-
-void inspectDevice(WGPUDevice device) {
-
-    size_t featureCount = wgpuDeviceEnumerateFeatures(device, NULL);
-    WGPUFeatureName features[featureCount];
-    wgpuDeviceEnumerateFeatures(device, features);
-
-    printf("Device features:\n");
-    for (size_t i = 0; i < featureCount; i++) {
-        printf("\t0x%0x\n", features[i]);
-    }
-
-    WGPUSupportedLimits supportedLimits = {.nextInChain = NULL};
-    bool success = wgpuDeviceGetLimits(device, &supportedLimits);
-    if (success) {
-        WGPULimits *const limits = &supportedLimits.limits;
-        printf("Device limits:\n");
-        printf("\tmaxTextureDimension1D: %d\n", limits->maxTextureDimension1D);
-        printf("\tmaxTextureDimension2D: %d\n", limits->maxTextureDimension2D);
-        printf("\tmaxTextureDimension3D: %d\n", limits->maxTextureDimension3D);
-        printf("\tmaxTextureArrayLayers: %d\n", limits->maxTextureArrayLayers);
-    }
-}
-

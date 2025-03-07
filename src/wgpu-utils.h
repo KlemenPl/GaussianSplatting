@@ -11,8 +11,4 @@ WGPUAdapter requestAdapter(WGPUInstance instance, const WGPURequestAdapterOption
 
 WGPUDevice requestDevice(WGPUAdapter adapter, const WGPUDeviceDescriptor *desc);
 
-void inspectAdapter(WGPUAdapter adapter);
-
-void inspectDevice(WGPUDevice device);
-
 #endif //WEBGPU_UTILS_H

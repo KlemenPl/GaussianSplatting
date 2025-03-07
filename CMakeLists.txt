@@ -8,7 +8,18 @@ add_compile_options(-Wall -pedantic)
 
 add_subdirectory(cglm)
 add_subdirectory(webgpu)
-add_subdirectory(glfw3webgpu)
+
+if (WIN32)
+    add_definitions(-DGLFW_EXPOSE_NATIVE_WIN32)
+    set(OS_LIBRARIES d3dcompiler ws2_32 userenv bcrypt ntdll opengl32 Propsys RuntimeObject)
+elseif(UNIX AND NOT APPLE)
+    add_definitions(-DGLFW_EXPOSE_NATIVE_X11)
+    add_definitions(-DGLFW_EXPOSE_NATIVE_WAYLAND)
+    set(OS_LIBRARIES "-lm -ldl")
+elseif(APPLE)
+    add_definitions(-DGLFW_EXPOSE_NATIVE_COCOA)
+    set(OS_LIBRARIES "-framework CoreFoundation -framework QuartzCore -framework Metal")
+endif()
 
 # GLFW library
 set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
@@ -33,7 +44,7 @@ add_executable(GaussianSplatting
         src/wgpu-utils.h
 )
 
-target_link_libraries(GaussianSplatting PRIVATE webgpu cglm glfw glfw3webgpu)
+target_link_libraries(GaussianSplatting PRIVATE webgpu cglm glfw ${OS_LIBRARIES})
 target_copy_webgpu_binaries(GaussianSplatting)
 
 if (EMSCRIPTEN)

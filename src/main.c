@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "app.h"
 #include "camera.h"
@@ -213,9 +214,11 @@ int init(const AppState *app, int argc, const char **argv) {
     });
     const char *shaderSource = readFile("shader.wgsl");
     WGPUShaderModule shaderModule = wgpuDeviceCreateShaderModule(app->device, &(WGPUShaderModuleDescriptor) {
-        .nextInChain = (WGPUChainedStruct*) &(WGPUShaderModuleWGSLDescriptor) {
-            .chain.sType = WGPUSType_ShaderModuleWGSLDescriptor,
-            .code = shaderSource,
+        .nextInChain = (WGPUChainedStruct*) &(WGPUShaderSourceWGSL) {
+            .chain = (WGPUChainedStruct) {
+                .sType = WGPUSType_ShaderSourceWGSL,
+            },
+            .code = {shaderSource, strlen(shaderSource)},
         },
     });
     free(shaderSource);
@@ -224,14 +227,14 @@ int init(const AppState *app, int argc, const char **argv) {
         .layout = pipelineLayout,
         .compute = {
             .module = shaderModule,
-            .entryPoint = "transform_main",
+            .entryPoint = {"transform_main", WGPU_STRLEN},
         }
     });
     sortPipeline = wgpuDeviceCreateComputePipeline(app->device, &(WGPUComputePipelineDescriptor) {
         .layout = pipelineLayout,
         .compute = {
             .module = shaderModule,
-            .entryPoint = "sort_main",
+            .entryPoint = {"sort_main", WGPU_STRLEN},
         }
     });
 
@@ -243,13 +246,13 @@ int init(const AppState *app, int argc, const char **argv) {
         .primitive.cullMode = WGPUCullMode_None,
         .vertex.module = shaderModule,
         .vertex.bufferCount = 0,
-        .vertex.entryPoint = "vs_main",
+        .vertex.entryPoint = {"vs_main", WGPU_STRLEN},
         .fragment = &(WGPUFragmentState) {
             .module = shaderModule,
-            .entryPoint = "fs_main",
+            .entryPoint = {"fs_main", WGPU_STRLEN},
             .targetCount = 1,
             .targets = (WGPUColorTargetState[]) {
-                [0].format = app->surfaceFormat,
+                [0].format = app->format,
                 [0].writeMask = WGPUColorWriteMask_All,
                 [0].blend = &(WGPUBlendState) {
                     .color = {
@@ -317,7 +320,7 @@ void sortCPU(vec4 *positions, uint32_t *indices, uint32_t n) {
 
 bool stagingMapped = false;
 WGPUBuffer stagingBuffer = 0;
-void mapBuffer(WGPUBufferMapAsyncStatus status, void *userData) {
+void mapBuffer(WGPUMapAsyncStatus status, void *userData) {
     uint32_t posSize = wgpuBufferGetSize(transformedPosBuffer);
     uint32_t indicesSize = wgpuBufferGetSize(sortedIndexBuffer);
     const void *data = wgpuBufferGetMappedRange(stagingBuffer, 0, posSize + indicesSize);
@@ -344,7 +347,7 @@ void dispatchComputeSortPass(WGPUDevice device, uint32_t pattern) {
         .comparePattern = pattern,
     };
     wgpuQueueWriteBuffer(queue, sortUniformBuffer, 0, &sortUniform, sizeof(sortUniform));
-    WGPUComputePassEncoder computePass = wgpuCommandEncoderBeginComputePass(encoder, NULL);
+    WGPUComputePassEncoder computePass = wgpuCommandEncoderBeginComputePass(encoder, &(WGPUComputePassDescriptor) {.nextInChain = NULL});
     wgpuComputePassEncoderSetPipeline(computePass, sortPipeline);
     wgpuComputePassEncoderSetBindGroup(computePass, 0, bindGroup, 0, NULL);
     uint32_t workgroups = (numSplats + 255) / 256;
@@ -356,6 +359,7 @@ void dispatchComputeSortPass(WGPUDevice device, uint32_t pattern) {
     WGPUCommandBuffer command = wgpuCommandEncoderFinish(encoder, NULL);
     wgpuQueueSubmit(queue, 1, &command);
     wgpuCommandEncoderRelease(encoder);
+    wgpuCommandBufferRelease(command);
 }
 
 void render(const AppState *app, float dt) {
@@ -401,6 +405,7 @@ void render(const AppState *app, float dt) {
         WGPUCommandBuffer command = wgpuCommandEncoderFinish(encoder, NULL);
         wgpuQueueSubmit(queue, 1, &command);
         wgpuCommandEncoderRelease(encoder);
+        wgpuCommandBufferRelease(command);
         encoder = wgpuDeviceCreateCommandEncoder(app->device, &(WGPUCommandEncoderDescriptor) {});
     }
     // Sort pass
@@ -473,25 +478,16 @@ void render(const AppState *app, float dt) {
             .nextInChain = NULL,
             .colorAttachmentCount = 1,
             .colorAttachments = &(WGPURenderPassColorAttachment) {
-                .view = app->surfaceView,
-                .resolveTarget = NULL,
+                .view = app->view,
                 .loadOp = WGPULoadOp_Clear,
                 .storeOp = WGPUStoreOp_Store,
-                /*
-                .clearValue.r = 0.7,
-                .clearValue.g = 0.7,
-                .clearValue.b = 0.8,
-                .clearValue.a = 1.0,
-                */
                 .clearValue = {
                     .r = 1.0f,
                     .g = 1.0f,
                     .b = 1.0f,
                     .a = 1.0f
                 },
-#ifndef WEBGPU_BACKEND_WGPU
-                .depthSlive = WGPU_DEPTH_SLICE_UNDEFINED,
-#endif
+                .depthSlice = WGPU_DEPTH_SLICE_UNDEFINED,
             },
             .depthStencilAttachment = NULL,
             .timestampWrites = NULL,

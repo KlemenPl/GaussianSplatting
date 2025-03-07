@@ -10,14 +10,31 @@
 #include <stdio.h>
 #include <signal.h>
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#include <emscripten/html5.h>
+#include <emscripten/html5_webgpu.h>
+#endif
+
 #include "input.h"
+
+#define GLFW_INCLUDE_NONE
+#include <GLFW/glfw3.h>
+#include <GLFW/glfw3native.h>
+#include <webgpu/webgpu.h>
+
 #include "wgpu-utils.h"
 
 
 typedef struct AppState {
+    GLFWwindow *window;
+    WGPUInstance instance;
+    WGPUSurface surface;
+    WGPUAdapter adapter;
     WGPUDevice device;
-    WGPUTextureFormat surfaceFormat;
-    WGPUTextureView surfaceView;
+    WGPUTextureFormat format;
+    WGPUSurfaceConfiguration config;
+    WGPUTextureView view;
 } AppState;
 
 typedef int (*AppInitFn)(const AppState *app, int argc, char **argv);
@@ -36,131 +53,203 @@ typedef struct AppConfig {
     AppDeInitFn deinit;
 } AppConfig;
 
-static void deviceLostCB(WGPUDeviceLostReason reason, const char *message, void *) {
-    fprintf(stderr , "Device lost: 0x%0x (%s)\n", reason, message ? message : "?");
-}
-
-static void deviceErrorCB(WGPUErrorType type, const char *message, void *) {
-    fprintf(stderr, "Device error: 0x%0x (%s)\n", type, message ? message : "?");
-#ifndef NDEBUG
-    // Trigger debug breakpoint
-    raise(SIGTRAP);
-#endif
-}
-
-
 #ifndef APP_NO_MAIN
 
 #include <webgpu/webgpu.h>
 #include <webgpu/wgpu.h>
 
 #include <GLFW/glfw3.h>
-#include <glfw3webgpu.h>
 
 extern AppConfig appMain();
 
+static void _glfwErrorCallback(int error, const char *description) {
+    fprintf(stderr, "GLFW error %d: %s\n", error, description);
+}
 
-WGPUTextureView getNextSurfaceTextureView(WGPUSurface surface) {
-    // Get the surface texture
-    WGPUSurfaceTexture surfaceTexture;
-    wgpuSurfaceGetCurrentTexture(surface, &surfaceTexture);
-    if (surfaceTexture.status != WGPUSurfaceGetCurrentTextureStatus_Success) {
-        return NULL;
+static void _wgpuLogCallback(WGPULogLevel level, WGPUStringView message, void *userdata) {
+    const char *logLevel = "Unknown";
+    switch (level) {
+        case WGPULogLevel_Error: logLevel = "ERROR"; break;
+        case WGPULogLevel_Warn:  logLevel = "WARN"; break;
+        case WGPULogLevel_Info:  logLevel = "INFO"; break;
+        case WGPULogLevel_Debug: logLevel = "DEBUG"; break;
+        case WGPULogLevel_Trace: logLevel = "TRACE"; break;
+        default: break;
     }
 
-    // Create a view for this surface texture
-    WGPUTextureView targetView = wgpuTextureCreateView(surfaceTexture.texture, &(WGPUTextureViewDescriptor) {
-        .nextInChain = NULL,
-        .label = "Surface texture view",
-        .format = wgpuTextureGetFormat(surfaceTexture.texture),
-        .dimension = WGPUTextureViewDimension_2D,
-        .baseMipLevel = 0,
-        .mipLevelCount = 1,
-        .baseArrayLayer = 0,
-        .arrayLayerCount = 1,
-        .aspect = WGPUTextureAspect_All,
+    if (level < WGPULogLevel_Warn) {
+        raise(SIGTRAP);
+    }
+
+    fprintf(stderr, "WGPU [%s]: %s\n", logLevel, message);
+}
+
+
+static bool _initWebGPU(AppState *state) {
+#ifdef WEBGPU_BACKEND_EMSCRIPTEN
+    state->instance = wgpuCreateInstance(NULL);
+#else
+    state->instance = wgpuCreateInstance(NULL);
+#endif
+    if (state->instance == NULL) {
+        fprintf(stderr, "Failed to create WebGPU instance\n");
+        return false;
+    }
+
+
+    #if defined(GLFW_EXPOSE_NATIVE_COCOA)
+  {
+    id metal_layer = NULL;
+    NSWindow *ns_window = glfwGetCocoaWindow(window);
+    [ns_window.contentView setWantsLayer:YES];
+    metal_layer = [CAMetalLayer layer];
+    [ns_window.contentView setLayer:metal_layer];
+    demo.surface = wgpuInstanceCreateSurface(
+        demo.instance,
+        &(const WGPUSurfaceDescriptor){
+            .nextInChain =
+                (const WGPUChainedStruct *)&(
+                    const WGPUSurfaceSourceMetalLayer){
+                    .chain =
+                        (const WGPUChainedStruct){
+                            .sType = WGPUSType_SurfaceSourceMetalLayer,
+                        },
+                    .layer = metal_layer,
+                },
+        });
+  }
+#elif defined(GLFW_EXPOSE_NATIVE_WAYLAND) && defined(GLFW_EXPOSE_NATIVE_X11)
+  if (glfwGetPlatform() == GLFW_PLATFORM_X11) {
+    Display *x11_display = glfwGetX11Display();
+    Window x11_window = glfwGetX11Window(state->window);
+    state->surface = wgpuInstanceCreateSurface(
+        state->instance,
+        &(const WGPUSurfaceDescriptor){
+            .nextInChain =
+                (const WGPUChainedStruct *)&(
+                    const WGPUSurfaceSourceXlibWindow){
+                    .chain =
+                        (const WGPUChainedStruct){
+                            .sType = WGPUSType_SurfaceSourceXlibWindow,
+                        },
+                    .display = x11_display,
+                    .window = x11_window,
+                },
+        });
+  }
+  if (false && glfwGetPlatform() == GLFW_PLATFORM_WAYLAND) {
+    struct wl_display *wayland_display = glfwGetWaylandDisplay();
+    struct wl_surface *wayland_surface = glfwGetWaylandWindow(state->window);
+    state->surface = wgpuInstanceCreateSurface(
+        state->instance,
+        &(const WGPUSurfaceDescriptor){
+            .nextInChain =
+                (const WGPUChainedStruct *)&(
+                    const WGPUSurfaceSourceWaylandSurface){
+                    .chain =
+                        (const WGPUChainedStruct){
+                            .sType =
+                                WGPUSType_SurfaceSourceWaylandSurface,
+                        },
+                    .display = wayland_display,
+                    .surface = wayland_surface,
+                },
+        });
+  }
+#elif defined(GLFW_EXPOSE_NATIVE_WIN32)
+  {
+    HWND hwnd = glfwGetWin32Window(window);
+    HINSTANCE hinstance = GetModuleHandle(NULL);
+    demo.surface = wgpuInstanceCreateSurface(
+        demo.instance,
+        &(const WGPUSurfaceDescriptor){
+            .nextInChain =
+                (const WGPUChainedStruct *)&(
+                    const WGPUSurfaceSourceWindowsHWND){
+                    .chain =
+                        (const WGPUChainedStruct){
+                            .sType = WGPUSType_SurfaceSourceWindowsHWND,
+                        },
+                    .hinstance = hinstance,
+                    .hwnd = hwnd,
+                },
+        });
+  }
+#else
+#error "Unsupported GLFW native platform"
+#endif
+    if (state->surface == NULL) {
+        fprintf(stderr, "Failed to create GLFW window surface\n");
+        return false;
+    }
+
+    state->adapter = requestAdapter(state->instance, &(WGPURequestAdapterOptions){
+        .backendType = WGPUBackendType_Vulkan,
+        .powerPreference = WGPUPowerPreference_HighPerformance,
+        .compatibleSurface = state->surface,
     });
+    if (state->adapter == NULL) {
+        fprintf(stderr, "Failed to create WebGPU adapter\n");
+        return false;
+    }
 
-#ifndef WEBGPU_BACKEND_WGPU
-    // We no longer need the texture, only its view
-    // (NB: with wgpu-native, surface textures must not be manually released)
-    wgpuTextureRelease(surfaceTexture.texture);
-#endif // WEBGPU_BACKEND_WGPU
+    state->device = requestDevice(state->adapter, &(WGPUDeviceDescriptor){
+        .requiredFeatureCount = 1,
+        .requiredFeatures = (WGPUFeatureName[]){
+        WGPUNativeFeature_VertexWritableStorage
+        }
+    });
+    if (state->device == NULL) {
+        fprintf(stderr, "Failed to create WebGPU device\n");
+        return false;
+    }
 
-    return targetView;
+
+    return true;
 }
 
 int main(int argc, const char **argv) {
     AppConfig config = appMain();
 
-    glfwInit();
+    glfwSetErrorCallback(_glfwErrorCallback);
+    if (!glfwInit())
+        return 1;
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
     GLFWwindow *window = glfwCreateWindow(config.width, config.height, config.title, NULL, NULL);
 
-#ifdef WEBGPU_BACKEND_EMSCRIPTEN
-    WGPUInstance instance = wgpuCreateInstance(NULL);
-#else
-    WGPUInstance instance = wgpuCreateInstance(&(WGPUInstanceDescriptor){
-        .nextInChain = NULL,
-    });
-#endif
-    if (!instance) {
-        printf("Could not initialize WebGPU!\n");
+    AppState state = {
+        .window = window,
+    };
+
+    wgpuSetLogLevel(WGPULogLevel_Info);
+    wgpuSetLogCallback(_wgpuLogCallback, NULL);
+    if (!_initWebGPU(&state)) {
+        glfwTerminate();
         return 1;
     }
 
-    WGPUSurface surface = glfwGetWGPUSurface(instance, window);
-    printf("WGPU instance: %p\n", instance);
+    WGPUSurfaceCapabilities surfaceCapabilities = {0};
+    wgpuSurfaceGetCapabilities(state.surface, state.adapter, &surfaceCapabilities);
 
-    WGPUAdapter adapter = requestAdapter(instance, &(WGPURequestAdapterOptions) {
-        .nextInChain = NULL,
-        .compatibleSurface = surface,
-    });
-    wgpuInstanceRelease(instance);
-    printf("\nWGPU Adapter: %p\n", adapter);
-    inspectAdapter(adapter);
-
-    WGPUDevice device = requestDevice(adapter, &(WGPUDeviceDescriptor) {
-        .nextInChain = NULL,
-        .label = "My Device",
-        .requiredFeatureCount = 1,
-        .requiredFeatures = (WGPUFeatureName[]) {
-            // TODO: Disable?
-            WGPUNativeFeature_VertexWritableStorage,
-        },
-        .requiredLimits = NULL,
-        .defaultQueue.nextInChain = NULL,
-        .defaultQueue.label = "My Queue",
-        .deviceLostCallback = deviceLostCB,
-    });
-    printf("\nWGPU Device: %p\n", device);
-    inspectDevice(device);
-    printf("\n");
-    wgpuDeviceSetUncapturedErrorCallback(device, deviceErrorCB, NULL);
-
-    WGPUTextureFormat surfaceFormat = wgpuSurfaceGetPreferredFormat(surface, adapter);
-    wgpuSurfaceConfigure(surface, &(WGPUSurfaceConfiguration) {
-        .format = surfaceFormat,
+    state.format = surfaceCapabilities.formats[0];
+    state.config = (WGPUSurfaceConfiguration) {
+        .device = state.device,
         .usage = WGPUTextureUsage_RenderAttachment,
-        .device = device,
+        .format = surfaceCapabilities.formats[0],
+        .presentMode = WGPUPresentMode_Fifo,
+        .alphaMode = surfaceCapabilities.alphaModes[0],
         .width = config.width,
         .height = config.height,
-        .nextInChain = NULL,
-        .presentMode = WGPUPresentMode_Fifo,
-        .alphaMode = WGPUCompositeAlphaMode_Auto,
-    });
-    wgpuAdapterRelease(adapter);
+    };
+    wgpuSurfaceConfigure(state.surface, &state.config);
+
+    glfwShowWindow(window);
 
     inputInit(window);
 
-    AppState appState = {
-        .device = device,
-        .surfaceFormat = surfaceFormat,
-    };
-
     int status = 0;
-    if (config.init) status = config.init(&appState, argc, argv);
+    if (config.init) status = config.init(&state, argc, argv);
     if (status != 0) {
         fprintf(stderr, "Failed to initialize application!\n");
     }
@@ -176,31 +265,57 @@ int main(int argc, const char **argv) {
         inputUpdate();
         glfwPollEvents();
 
-        if (config.update) config.update(&appState, deltaTime);
+        if (config.update) config.update(&state, deltaTime);
 
-        WGPUTextureView targetView = getNextSurfaceTextureView(surface);
+        WGPUSurfaceTexture surfaceTexture;
+        wgpuSurfaceGetCurrentTexture(state.surface, &surfaceTexture);
+        switch (surfaceTexture.status) {
+            case WGPUSurfaceGetCurrentTextureStatus_SuccessOptimal:
+            case WGPUSurfaceGetCurrentTextureStatus_SuccessSuboptimal:
+              // All good, could handle suboptimal here
+              break;
+            case WGPUSurfaceGetCurrentTextureStatus_Timeout:
+            case WGPUSurfaceGetCurrentTextureStatus_Outdated:
+            case WGPUSurfaceGetCurrentTextureStatus_Lost: {
+                // Skip this frame, and re-configure surface.
+                if (surfaceTexture.texture != NULL) {
+                    wgpuTextureRelease(surfaceTexture.texture);
+                }
+                int width, height;
+                glfwGetWindowSize(window, &width, &height);
+                if (width != 0 && height != 0) {
+                    state.config.width = width;
+                    state.config.height = height;
+                    wgpuSurfaceConfigure(state.surface, &state.config);
+                }
+                continue;
+            }
 
-        appState.surfaceView = targetView;
-        if (config.render) config.render(&appState, deltaTime);
-        appState.surfaceView = NULL,
+        }
+        WGPUTextureView view = wgpuTextureCreateView(surfaceTexture.texture, NULL);
+        state.view = view;
 
-        wgpuTextureViewRelease(targetView);
-#ifndef __EMSCRIPTEN__
-        wgpuSurfacePresent(surface);
-#endif
+        if (config.render) config.render(&state, deltaTime);
 
-        wgpuDevicePoll(device, false, NULL);
+
+        wgpuSurfacePresent(state.surface);
+        wgpuTextureViewRelease(view);
+        wgpuTextureRelease(surfaceTexture.texture);
+
+        wgpuDevicePoll(state.device, false, NULL);
 
         prevFrame = currFrame;
         currFrame = glfwGetTime();
     }
 
     if (config.deinit)
-        config.deinit(&appState);
+        config.deinit(&state);
 
-    wgpuSurfaceUnconfigure(surface);
-    wgpuSurfaceRelease(surface);
-    wgpuDeviceRelease(device);
+    wgpuInstanceRelease(state.instance);
+    wgpuSurfaceUnconfigure(state.surface);
+    wgpuSurfaceRelease(state.surface);
+    wgpuAdapterRelease(state.adapter);
+    wgpuDeviceRelease(state.device);
     glfwDestroyWindow(window);
     glfwTerminate();
 
@@ -208,6 +323,5 @@ int main(int argc, const char **argv) {
 }
 
 #endif
-
 
 #endif //APP_H
