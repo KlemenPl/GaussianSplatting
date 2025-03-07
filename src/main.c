@@ -341,13 +341,13 @@ void mapBuffer(WGPUMapAsyncStatus status, void *userData) {
 }
 
 void dispatchComputeSortPass(WGPUDevice device, uint32_t pattern) {
-    WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(device, NULL);
+    WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(device, &(WGPUCommandEncoderDescriptor){});
     static uint32_t x = 0;
     SortUniform sortUniform = {
         .comparePattern = pattern,
     };
     wgpuQueueWriteBuffer(queue, sortUniformBuffer, 0, &sortUniform, sizeof(sortUniform));
-    WGPUComputePassEncoder computePass = wgpuCommandEncoderBeginComputePass(encoder, &(WGPUComputePassDescriptor) {.nextInChain = NULL});
+    WGPUComputePassEncoder computePass = wgpuCommandEncoderBeginComputePass(encoder, NULL);
     wgpuComputePassEncoderSetPipeline(computePass, sortPipeline);
     wgpuComputePassEncoderSetBindGroup(computePass, 0, bindGroup, 0, NULL);
     uint32_t workgroups = (numSplats + 255) / 256;
@@ -360,6 +360,7 @@ void dispatchComputeSortPass(WGPUDevice device, uint32_t pattern) {
     wgpuQueueSubmit(queue, 1, &command);
     wgpuCommandEncoderRelease(encoder);
     wgpuCommandBufferRelease(command);
+    wgpuDevicePoll(device, true, NULL);
 }
 
 void render(const AppState *app, float dt) {
@@ -407,6 +408,7 @@ void render(const AppState *app, float dt) {
         wgpuCommandEncoderRelease(encoder);
         wgpuCommandBufferRelease(command);
         encoder = wgpuDeviceCreateCommandEncoder(app->device, &(WGPUCommandEncoderDescriptor) {});
+        wgpuDevicePoll(app->device, true, NULL);
     }
     // Sort pass
     if (1) {
