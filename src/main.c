@@ -50,6 +50,7 @@ WGPUComputePipeline sortPipeline;
 
 WGPUBuffer uniformBuffer;
 WGPUBuffer sortUniformBuffer;
+WGPUBuffer stagingSortUniformBuffer;
 WGPUBuffer splatsBuffer;
 WGPUBuffer transformedPosBuffer;
 WGPUBuffer sortedIndexBuffer;
@@ -116,6 +117,11 @@ int init(const AppState *app, int argc, const char **argv) {
         .label = "Sort Uniform Buffer",
         .size = sizeof(SortUniform),
         .usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform,
+    });
+    stagingSortUniformBuffer = wgpuDeviceCreateBuffer(app->device, &(WGPUBufferDescriptor) {
+        .label = "Staging Uniform Buffer",
+        .size = 10000 * sizeof(SortUniform),
+        .usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_CopySrc,
     });
 
     bindGroupLayout = wgpuDeviceCreateBindGroupLayout(app->device, &(WGPUBindGroupLayoutDescriptor) {
@@ -281,6 +287,7 @@ void deinit(const AppState *app) {
     wgpuBindGroupRelease(bindGroup);
     wgpuPipelineLayoutRelease(pipelineLayout);
 
+    wgpuBufferRelease(stagingSortUniformBuffer);
     wgpuBufferRelease(sortUniformBuffer);
     wgpuBufferRelease(uniformBuffer);
     wgpuBufferRelease(sortedIndexBuffer);
@@ -340,30 +347,8 @@ void mapBuffer(WGPUMapAsyncStatus status, void *userData) {
     stagingMapped = false;
 }
 
-void dispatchComputeSortPass(WGPUDevice device, uint32_t pattern) {
-    WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(device, &(WGPUCommandEncoderDescriptor){});
-    static uint32_t x = 0;
-    SortUniform sortUniform = {
-        .comparePattern = pattern,
-    };
-    wgpuQueueWriteBuffer(queue, sortUniformBuffer, 0, &sortUniform, sizeof(sortUniform));
-    WGPUComputePassEncoder computePass = wgpuCommandEncoderBeginComputePass(encoder, NULL);
-    wgpuComputePassEncoderSetPipeline(computePass, sortPipeline);
-    wgpuComputePassEncoderSetBindGroup(computePass, 0, bindGroup, 0, NULL);
-    uint32_t workgroups = (numSplats + 255) / 256;
-    wgpuComputePassEncoderDispatchWorkgroups(computePass, workgroups, 1, 1);
-    wgpuComputePassEncoderEnd(computePass);
-    wgpuComputePassEncoderRelease(computePass);
-
-
-    WGPUCommandBuffer command = wgpuCommandEncoderFinish(encoder, NULL);
-    wgpuQueueSubmit(queue, 1, &command);
-    wgpuCommandEncoderRelease(encoder);
-    wgpuCommandBufferRelease(command);
-    wgpuDevicePoll(device, true, NULL);
-}
-
 void render(const AppState *app, float dt) {
+    static bool cameraUpdated = true;
     if (inputIsKeyPressed(GLFW_KEY_ESCAPE)) {
         exit(0);
     }
@@ -375,11 +360,13 @@ void render(const AppState *app, float dt) {
         mouseDelta[1] = - mouseDelta[1];
 
         arcballCameraRotate(&camera, mouseDelta);
+        cameraUpdated = true;
     }
     vec2 wheelDelta;
     inputGetMouseWheelDelta(wheelDelta);
     if (wheelDelta[1] != 0.0) {
         arcballCameraZoom(&camera, -wheelDelta[1] * 0.2f);
+        cameraUpdated = true;
     }
     arcballCameraUpdate(&camera);
 
@@ -395,31 +382,48 @@ void render(const AppState *app, float dt) {
 
     wgpuQueueWriteBuffer(queue, uniformBuffer, 0, &uniform, sizeof(uniform));
     // Transform pass
-    if (1) {
+    cameraUpdated = true;
+    if (cameraUpdated) {
         WGPUComputePassEncoder transformPass = wgpuCommandEncoderBeginComputePass(encoder, NULL);
         wgpuComputePassEncoderSetPipeline(transformPass, transformPipeline);
         wgpuComputePassEncoderSetBindGroup(transformPass, 0, bindGroup, 0, NULL);
         wgpuComputePassEncoderDispatchWorkgroups(transformPass, (numSplats + 255) / 256, 1, 1);
         wgpuComputePassEncoderEnd(transformPass);
         wgpuComputePassEncoderRelease(transformPass);
-
-        WGPUCommandBuffer command = wgpuCommandEncoderFinish(encoder, NULL);
-        wgpuQueueSubmit(queue, 1, &command);
-        wgpuCommandEncoderRelease(encoder);
-        wgpuCommandBufferRelease(command);
-        encoder = wgpuDeviceCreateCommandEncoder(app->device, &(WGPUCommandEncoderDescriptor) {});
-        wgpuDevicePoll(app->device, true, NULL);
     }
     // Sort pass
-    if (1) {
-
-        uint32_t n = numSplats;
-        for (uint32_t k = 2; (k >> 1) < n; k <<= 1) {
-            dispatchComputeSortPass(app->device, (k - 1));
+    if (cameraUpdated) {
+        uint32_t uniformCount = 0;
+        for (uint32_t k = 2; (k >> 1) < numSplats; k <<= 1) {
+            uniformCount++;
             for (uint32_t j = k >> 1; 0 < j; j >>= 1) {
-                dispatchComputeSortPass(app->device, j);
+                uniformCount++;
             }
         }
+        SortUniform sortUniforms[uniformCount];
+        uint32_t uniformIndex = 0;
+        for (uint32_t k = 2; (k >> 1) < numSplats; k <<= 1) {
+            sortUniforms[uniformIndex++] = (SortUniform) {k - 1};
+            for (uint32_t j = k >> 1; 0 < j; j >>= 1) {
+                sortUniforms[uniformIndex++] = (SortUniform) {j};
+            }
+        }
+        assert(uniformIndex == uniformCount);
+        assert(uniformCount * sizeof(SortUniform) <= wgpuBufferGetSize(stagingSortUniformBuffer));
+        wgpuQueueWriteBuffer(queue, stagingSortUniformBuffer, 0, sortUniforms, uniformCount * sizeof(SortUniform));
+
+        for (uint32_t i = 0; i < uniformCount; i++) {
+            uint32_t offset = i * sizeof(SortUniform);
+            wgpuCommandEncoderCopyBufferToBuffer(encoder, stagingSortUniformBuffer, offset, sortUniformBuffer, 0, sizeof(SortUniform));
+            WGPUComputePassEncoder computePass = wgpuCommandEncoderBeginComputePass(encoder, NULL);
+            wgpuComputePassEncoderSetPipeline(computePass, sortPipeline);
+            wgpuComputePassEncoderSetBindGroup(computePass, 0, bindGroup, 0, NULL);
+            uint32_t workgroups = (numSplats + 255) / 256;
+            wgpuComputePassEncoderDispatchWorkgroups(computePass, workgroups, 1, 1);
+            wgpuComputePassEncoderEnd(computePass);
+            wgpuComputePassEncoderRelease(computePass);
+        }
+
         /*
         for (uint32_t k = 2; k <= n; k <<= 1) {
             for (uint32_t j = k >> 1; j > 0; j >>= 1) {
@@ -470,6 +474,7 @@ void render(const AppState *app, float dt) {
         */
 
     }
+    cameraUpdated = false;
 
     //printf("%ld %ld %ld\n", wgpuBufferGetSize(vertexBuffer), wgpuBufferGetSize(vertexInBuffer), 4 * numSplats * sizeof(SplatVertex));
     //wgpuCommandEncoderCopyBufferToBuffer(encoder, vertexBuffer, 0, vertexInBuffer, 0, wgpuBufferGetSize(vertexBuffer));
