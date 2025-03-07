@@ -79,7 +79,8 @@ fn vs_main(
     let splat = splats[sIdx];
     let pos = transformedPos[sIdx];
     let s = uniforms.scale;
-    let z = pos.z;
+    let z = max(pos.z, 1.0);
+    //let z = pos.z;
 
     var out: VertexOutput;
     out.pos = pos + vec4f(quad[vIdx] * (s / z), 0.0, 0.0);
