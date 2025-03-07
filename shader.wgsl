@@ -107,6 +107,5 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
     let finalAlpha = gaus * a;
 
 
-    return vec4f(color.rgb * finalAlpha,  finalAlpha);
-    //return vec4(abs(in.offset.x), 0, 0, 1);
+    return vec4f(color.rgb,  finalAlpha);
 }
