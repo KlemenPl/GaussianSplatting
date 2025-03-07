@@ -25,7 +25,6 @@
 
 #include "wgpu-utils.h"
 
-
 typedef struct AppState {
     GLFWwindow *window;
     WGPUInstance instance;
@@ -237,7 +236,7 @@ int main(int argc, const char **argv) {
         .device = state.device,
         .usage = WGPUTextureUsage_RenderAttachment,
         .format = surfaceCapabilities.formats[0],
-        .presentMode = WGPUPresentMode_Fifo,
+        .presentMode = WGPUPresentMode_Immediate,
         .alphaMode = surfaceCapabilities.alphaModes[0],
         .width = config.width,
         .height = config.height,
