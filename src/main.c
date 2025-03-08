@@ -37,6 +37,8 @@ _Static_assert(offsetof(SortUniform, comparePattern) == 0, "");
 
 ArcballCamera camera = CAMERA_ARCBALL_DEFAULT;
 
+const char *splatFiles[] = {"nike.splat", "plush.splat", "train.splat", ""};
+
 uint32_t numSplats;
 
 WGPUQueue queue;
@@ -57,56 +59,7 @@ WGPUBuffer sortedIndexBuffer;
 WGPURenderPipeline renderPipeline;
 
 int init(const AppState *app, int argc, const char **argv) {
-    assert(argc == 2 && "Usage: ./program input_file");
-    const char *input = argv[1];
-    FILE *f = fopen(input, "rb");
-    if (!f) {
-        fprintf(stderr, "Failed to open file %s\n", input);
-        return 1;
-    }
-    fseek(f, 0, SEEK_END);
-    size_t fileSize = ftell(f);
-    numSplats = fileSize / sizeof(SplatRaw);
-    assert(fileSize % sizeof(SplatRaw) == 0 && "Invalid file length");
-    Splat *points = malloc(numSplats * sizeof(*points));
-    fseek(f, 0, SEEK_SET);
-    vec3 center = {0, 0, 0};
-    for (size_t i = 0, idx = 0; i < fileSize; i += sizeof(SplatRaw), idx++) {
-        SplatRaw splatRaw;
-        fread(&splatRaw, sizeof(splatRaw), 1, f);
-        glm_vec3_add(center, splatRaw.pos, center);
-
-        glm_vec3_copy(splatRaw.pos, points[idx].pos);
-        glm_vec3_copy(splatRaw.scale, points[idx].scale);
-        points[idx].color = splatRaw.color;
-        points[idx].rotation = splatRaw.rotation;
-    }
-    glm_vec3_div(center, (vec3){numSplats, numSplats, numSplats}, camera.center);
-    fclose(f);
-    printf("Loaded %s (%ld points)\n", argv[1], numSplats);
-
-
     queue = wgpuDeviceGetQueue(app->device);
-
-    splatsBuffer = wgpuDeviceCreateBuffer(app->device, &(WGPUBufferDescriptor) {
-        .label = "Splats Buffer",
-        .usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Vertex | WGPUBufferUsage_Storage,
-        .size = numSplats * sizeof(Splat),
-        .mappedAtCreation = false
-    });
-    wgpuQueueWriteBuffer(queue, splatsBuffer, 0, points, numSplats * sizeof(Splat));
-    free(points);
-
-    transformedPosBuffer = wgpuDeviceCreateBuffer(app->device, &(WGPUBufferDescriptor) {
-        .label = "Transformed Positions",
-        .usage = WGPUBufferUsage_Storage | WGPUBufferUsage_Vertex | WGPUBufferUsage_CopySrc,
-        .size = numSplats * sizeof(vec4),
-    });
-    sortedIndexBuffer = wgpuDeviceCreateBuffer(app->device, &(WGPUBufferDescriptor) {
-        .label = "Sorted Indices",
-        .usage = WGPUBufferUsage_Storage | WGPUBufferUsage_Vertex | WGPUBufferUsage_CopySrc,
-        .size = numSplats * sizeof(uint32_t),
-    });
 
     uniformBuffer = wgpuDeviceCreateBuffer(app->device, &(WGPUBufferDescriptor) {
         .label = "Uniform Buffer",
@@ -124,162 +77,6 @@ int init(const AppState *app, int argc, const char **argv) {
         .usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_CopySrc,
     });
 
-    bindGroupLayout = wgpuDeviceCreateBindGroupLayout(app->device, &(WGPUBindGroupLayoutDescriptor) {
-        .entryCount = 5,
-        .entries = (WGPUBindGroupLayoutEntry[]) {
-            [0] = {
-                .binding = 0,
-                .visibility = WGPUShaderStage_Compute | WGPUShaderStage_Vertex,
-                .buffer = {
-                    .type = WGPUBufferBindingType_Uniform,
-                    .minBindingSize = sizeof(Uniform),
-                },
-            },
-            [1] = {
-                .binding = 1,
-                .visibility = WGPUShaderStage_Compute,
-                .buffer = {
-                    .type = WGPUBufferBindingType_Uniform,
-                    .minBindingSize = sizeof(SortUniform),
-                }
-            },
-            [2] = {
-                .binding = 2,
-                .visibility = WGPUShaderStage_Compute | WGPUShaderStage_Vertex,
-                .buffer = {
-                    .type = WGPUBufferBindingType_ReadOnlyStorage,
-                    .minBindingSize = wgpuBufferGetSize(splatsBuffer),
-                }
-            },
-            [3] = {
-                .binding = 3,
-                .visibility = WGPUShaderStage_Compute | WGPUShaderStage_Vertex,
-                .buffer = {
-                    .type = WGPUBufferBindingType_Storage,
-                    .minBindingSize = wgpuBufferGetSize(transformedPosBuffer),
-                }
-            },
-            [4] = {
-                .binding = 4,
-                .visibility = WGPUShaderStage_Compute | WGPUShaderStage_Vertex,
-                .buffer = {
-                    .type = WGPUBufferBindingType_Storage,
-                    .minBindingSize = wgpuBufferGetSize(sortedIndexBuffer),
-                }
-            },
-        },
-        .label = "Bind Group Layout",
-    });
-
-
-    bindGroup = wgpuDeviceCreateBindGroup(app->device, &(WGPUBindGroupDescriptor) {
-        .layout = bindGroupLayout,
-        .entryCount = 5,
-        .entries = (WGPUBindGroupEntry[]) {
-            [0] = {
-                .binding = 0,
-                .buffer = uniformBuffer,
-                .offset = 0,
-                .size = sizeof(Uniform),
-            },
-            [1] = {
-                .binding = 1,
-                .buffer = sortUniformBuffer,
-                .offset = 0,
-                .size = sizeof(SortUniform),
-            },
-            [2] = {
-                .binding = 2,
-                .buffer = splatsBuffer,
-                .offset = 0,
-                .size = wgpuBufferGetSize(splatsBuffer),
-            },
-            [3] = {
-                .binding = 3,
-                .buffer = transformedPosBuffer,
-                .offset = 0,
-                .size = wgpuBufferGetSize(transformedPosBuffer),
-            },
-            [4] = {
-                .binding = 4,
-                .buffer = sortedIndexBuffer,
-                .offset = 0,
-                .size = wgpuBufferGetSize(sortedIndexBuffer),
-            }
-
-        },
-        .label = "Bind Group",
-    });
-
-    pipelineLayout = wgpuDeviceCreatePipelineLayout(app->device, &(WGPUPipelineLayoutDescriptor) {
-        .bindGroupLayoutCount = 1,
-        .bindGroupLayouts = (WGPUBindGroupLayout[]) {
-            bindGroupLayout,
-        },
-        .label = "Pipeline Layout",
-    });
-    const char *shaderSource = readFile("shader.wgsl");
-    WGPUShaderModule shaderModule = wgpuDeviceCreateShaderModule(app->device, &(WGPUShaderModuleDescriptor) {
-        .nextInChain = (WGPUChainedStruct*) &(WGPUShaderSourceWGSL) {
-            .chain = (WGPUChainedStruct) {
-                .sType = WGPUSType_ShaderSourceWGSL,
-            },
-            .code = {shaderSource, strlen(shaderSource)},
-        },
-    });
-    free(shaderSource);
-
-    transformPipeline = wgpuDeviceCreateComputePipeline(app->device, &(WGPUComputePipelineDescriptor) {
-        .layout = pipelineLayout,
-        .compute = {
-            .module = shaderModule,
-            .entryPoint = {"transform_main", WGPU_STRLEN},
-        }
-    });
-    sortPipeline = wgpuDeviceCreateComputePipeline(app->device, &(WGPUComputePipelineDescriptor) {
-        .layout = pipelineLayout,
-        .compute = {
-            .module = shaderModule,
-            .entryPoint = {"sort_main", WGPU_STRLEN},
-        }
-    });
-
-    renderPipeline = wgpuDeviceCreateRenderPipeline(app->device, &(WGPURenderPipelineDescriptor) {
-        .layout = pipelineLayout,
-        .primitive.topology = WGPUPrimitiveTopology_TriangleStrip,
-        .primitive.stripIndexFormat = WGPUIndexFormat_Undefined,
-        .primitive.frontFace = WGPUFrontFace_CCW,
-        .primitive.cullMode = WGPUCullMode_None,
-        .vertex.module = shaderModule,
-        .vertex.bufferCount = 0,
-        .vertex.entryPoint = {"vs_main", WGPU_STRLEN},
-        .fragment = &(WGPUFragmentState) {
-            .module = shaderModule,
-            .entryPoint = {"fs_main", WGPU_STRLEN},
-            .targetCount = 1,
-            .targets = (WGPUColorTargetState[]) {
-                [0].format = app->format,
-                [0].writeMask = WGPUColorWriteMask_All,
-                [0].blend = &(WGPUBlendState) {
-                    .color = {
-                        .operation = WGPUBlendOperation_Add,
-                        .srcFactor = WGPUBlendFactor_SrcAlpha,
-                        .dstFactor = WGPUBlendFactor_OneMinusSrcAlpha,
-                    },
-                    .alpha = {
-                        .operation = WGPUBlendOperation_Add,
-                        .srcFactor = WGPUBlendFactor_One,
-                        .dstFactor = WGPUBlendFactor_OneMinusSrcAlpha,
-                    },
-                }
-            }
-        },
-        .depthStencil = NULL,
-        .multisample.count = 1,
-        .multisample.mask = ~0u,
-        .multisample.alphaToCoverageEnabled = false,
-    });
-    wgpuShaderModuleRelease(shaderModule);
     return 0;
 }
 void deinit(const AppState *app) {
@@ -347,6 +144,246 @@ void mapBuffer(WGPUMapAsyncStatus status, void *userData) {
     stagingMapped = false;
 }
 
+void loadSplat(const AppState *app, const char *splatFile) {
+    FILE *f = fopen(splatFile, "rb");
+    if (!f) {
+        fprintf(stderr, "Failed to open file %s\n", splatFile);
+        exit(1);
+    }
+    fseek(f, 0, SEEK_END);
+    size_t fileSize = ftell(f);
+    numSplats = fileSize / sizeof(SplatRaw);
+    assert(fileSize % sizeof(SplatRaw) == 0 && "Invalid file length");
+    Splat *points = malloc(numSplats * sizeof(*points));
+    fseek(f, 0, SEEK_SET);
+
+    vec3 center = {0, 0, 0};
+    for (size_t i = 0, idx = 0; i < fileSize; i += sizeof(SplatRaw), idx++) {
+        SplatRaw splatRaw;
+        fread(&splatRaw, sizeof(splatRaw), 1, f);
+        glm_vec3_add(center, splatRaw.pos, center);
+        glm_vec3_copy(splatRaw.pos, points[idx].pos);
+        glm_vec3_copy(splatRaw.scale, points[idx].scale);
+        points[idx].color = splatRaw.color;
+        points[idx].rotation = splatRaw.rotation;
+    }
+    glm_vec3_div(center, (vec3){numSplats, numSplats, numSplats}, camera.center);
+
+    fclose(f);
+    printf("Loaded %s (%ld points)\n", splatFile, numSplats);
+
+    if (splatsBuffer) {
+        wgpuBufferRelease(splatsBuffer);
+    }
+    if (transformedPosBuffer) {
+        wgpuBufferRelease(transformedPosBuffer);
+    }
+    if (sortedIndexBuffer) {
+        wgpuBufferRelease(sortedIndexBuffer);
+    }
+
+
+    splatsBuffer = wgpuDeviceCreateBuffer(app->device, &(WGPUBufferDescriptor) {
+        .label = "Splats Buffer",
+        .usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Vertex | WGPUBufferUsage_Storage,
+        .size = numSplats * sizeof(Splat),
+        .mappedAtCreation = false
+    });
+    wgpuQueueWriteBuffer(queue, splatsBuffer, 0, points, numSplats * sizeof(Splat));
+
+    transformedPosBuffer = wgpuDeviceCreateBuffer(app->device, &(WGPUBufferDescriptor) {
+        .label = "Transformed Positions",
+        .usage = WGPUBufferUsage_Storage | WGPUBufferUsage_Vertex | WGPUBufferUsage_CopySrc,
+        .size = numSplats * sizeof(vec4),
+    });
+    sortedIndexBuffer = wgpuDeviceCreateBuffer(app->device, &(WGPUBufferDescriptor) {
+        .label = "Sorted Indices",
+        .usage = WGPUBufferUsage_Storage | WGPUBufferUsage_Vertex | WGPUBufferUsage_CopySrc,
+        .size = numSplats * sizeof(uint32_t),
+    });
+    free(points);
+
+    if (bindGroupLayout) {
+        wgpuBindGroupLayoutRelease(bindGroupLayout);
+    }
+    bindGroupLayout = wgpuDeviceCreateBindGroupLayout(app->device, &(WGPUBindGroupLayoutDescriptor) {
+        .entryCount = 5,
+        .entries = (WGPUBindGroupLayoutEntry[]) {
+            [0] = {
+                .binding = 0,
+                .visibility = WGPUShaderStage_Compute | WGPUShaderStage_Vertex,
+                .buffer = {
+                    .type = WGPUBufferBindingType_Uniform,
+                    .minBindingSize = sizeof(Uniform),
+                },
+            },
+            [1] = {
+                .binding = 1,
+                .visibility = WGPUShaderStage_Compute,
+                .buffer = {
+                    .type = WGPUBufferBindingType_Uniform,
+                    .minBindingSize = sizeof(SortUniform),
+                }
+            },
+            [2] = {
+                .binding = 2,
+                .visibility = WGPUShaderStage_Compute | WGPUShaderStage_Vertex,
+                .buffer = {
+                    .type = WGPUBufferBindingType_ReadOnlyStorage,
+                    .minBindingSize = wgpuBufferGetSize(splatsBuffer),
+                }
+            },
+            [3] = {
+                .binding = 3,
+                .visibility = WGPUShaderStage_Compute | WGPUShaderStage_Vertex,
+                .buffer = {
+                    .type = WGPUBufferBindingType_Storage,
+                    .minBindingSize = wgpuBufferGetSize(transformedPosBuffer),
+                }
+            },
+            [4] = {
+                .binding = 4,
+                .visibility = WGPUShaderStage_Compute | WGPUShaderStage_Vertex,
+                .buffer = {
+                    .type = WGPUBufferBindingType_Storage,
+                    .minBindingSize = wgpuBufferGetSize(sortedIndexBuffer),
+                }
+            },
+        },
+        .label = "Bind Group Layout",
+    });
+
+    if (bindGroup) {
+        wgpuBindGroupRelease(bindGroup);
+    }
+    bindGroup = wgpuDeviceCreateBindGroup(app->device, &(WGPUBindGroupDescriptor) {
+        .layout = bindGroupLayout,
+        .entryCount = 5,
+        .entries = (WGPUBindGroupEntry[]) {
+            [0] = {
+                .binding = 0,
+                .buffer = uniformBuffer,
+                .offset = 0,
+                .size = sizeof(Uniform),
+            },
+            [1] = {
+                .binding = 1,
+                .buffer = sortUniformBuffer,
+                .offset = 0,
+                .size = sizeof(SortUniform),
+            },
+            [2] = {
+                .binding = 2,
+                .buffer = splatsBuffer,
+                .offset = 0,
+                .size = wgpuBufferGetSize(splatsBuffer),
+            },
+            [3] = {
+                .binding = 3,
+                .buffer = transformedPosBuffer,
+                .offset = 0,
+                .size = wgpuBufferGetSize(transformedPosBuffer),
+            },
+            [4] = {
+                .binding = 4,
+                .buffer = sortedIndexBuffer,
+                .offset = 0,
+                .size = wgpuBufferGetSize(sortedIndexBuffer),
+            }
+
+        },
+        .label = "Bind Group",
+    });
+
+    if (pipelineLayout) {
+        wgpuPipelineLayoutRelease(pipelineLayout);
+    }
+    pipelineLayout = wgpuDeviceCreatePipelineLayout(app->device, &(WGPUPipelineLayoutDescriptor) {
+        .bindGroupLayoutCount = 1,
+        .bindGroupLayouts = (WGPUBindGroupLayout[]) {
+            bindGroupLayout,
+        },
+        .label = "Pipeline Layout",
+    });
+
+    const char *shaderSource = readFile("shader.wgsl");
+    WGPUShaderModule shaderModule = wgpuDeviceCreateShaderModule(app->device, &(WGPUShaderModuleDescriptor) {
+        .nextInChain = (WGPUChainedStruct*) &(WGPUShaderSourceWGSL) {
+            .chain = (WGPUChainedStruct) {
+                .sType = WGPUSType_ShaderSourceWGSL,
+            },
+            .code = {shaderSource, strlen(shaderSource)},
+        },
+    });
+    free(shaderSource);
+
+    if (transformPipeline) {
+        wgpuComputePipelineRelease(transformPipeline);
+    }
+    transformPipeline = wgpuDeviceCreateComputePipeline(app->device, &(WGPUComputePipelineDescriptor) {
+        .layout = pipelineLayout,
+        .compute = {
+            .module = shaderModule,
+            .entryPoint = {"transform_main", WGPU_STRLEN},
+        }
+    });
+
+    if (sortPipeline) {
+        wgpuComputePipelineRelease(sortPipeline);
+    }
+    sortPipeline = wgpuDeviceCreateComputePipeline(app->device, &(WGPUComputePipelineDescriptor) {
+        .layout = pipelineLayout,
+        .compute = {
+            .module = shaderModule,
+            .entryPoint = {"sort_main", WGPU_STRLEN},
+        }
+    });
+
+    if (renderPipeline) {
+        wgpuRenderPipelineRelease(renderPipeline);
+    }
+    renderPipeline = wgpuDeviceCreateRenderPipeline(app->device, &(WGPURenderPipelineDescriptor) {
+        .layout = pipelineLayout,
+        .primitive.topology = WGPUPrimitiveTopology_TriangleStrip,
+        .primitive.stripIndexFormat = WGPUIndexFormat_Undefined,
+        .primitive.frontFace = WGPUFrontFace_CCW,
+        .primitive.cullMode = WGPUCullMode_None,
+        .vertex.module = shaderModule,
+        .vertex.bufferCount = 0,
+        .vertex.entryPoint = {"vs_main", WGPU_STRLEN},
+        .fragment = &(WGPUFragmentState) {
+            .module = shaderModule,
+            .entryPoint = {"fs_main", WGPU_STRLEN},
+            .targetCount = 1,
+            .targets = (WGPUColorTargetState[]) {
+                [0].format = app->format,
+                [0].writeMask = WGPUColorWriteMask_All,
+                [0].blend = &(WGPUBlendState) {
+                    .color = {
+                        .operation = WGPUBlendOperation_Add,
+                        .srcFactor = WGPUBlendFactor_SrcAlpha,
+                        .dstFactor = WGPUBlendFactor_OneMinusSrcAlpha,
+                    },
+                    .alpha = {
+                        .operation = WGPUBlendOperation_Add,
+                        .srcFactor = WGPUBlendFactor_One,
+                        .dstFactor = WGPUBlendFactor_OneMinusSrcAlpha,
+                    },
+                }
+            }
+        },
+        .depthStencil = NULL,
+        .multisample.count = 1,
+        .multisample.mask = ~0u,
+        .multisample.alphaToCoverageEnabled = false,
+    });
+
+
+    wgpuShaderModuleRelease(shaderModule);
+
+
+}
+
 void render(const AppState *app, float dt) {
     static bool cameraUpdated = true;
     if (inputIsKeyPressed(GLFW_KEY_ESCAPE)) {
@@ -370,7 +407,18 @@ void render(const AppState *app, float dt) {
         arcballCameraZoom(&camera, -wheelDelta[1] * 0.2f);
         cameraUpdated = true;
     }
+
+    static bool changeSplat = true;
+    static int splatIdx = 0;
+
+    if (changeSplat) {
+        loadSplat(app, splatFiles[splatIdx]);
+        changeSplat = false;
+        cameraUpdated = true;
+    }
+
     arcballCameraUpdate(&camera);
+
 
     static Uniform uniform = {
         .scale = 0.125f,
@@ -512,6 +560,8 @@ void render(const AppState *app, float dt) {
 
         igBegin("GaussianSplatting", NULL, 0);
         igSliderFloat("Splat size", &uniform.scale, 0.01f, 1.0f, "%.2f", 0);
+        igSliderFloat3("Camera center", camera.center, -10.0f, 10.0f, "%.2f", 0);
+        changeSplat = igCombo_Str("Splat file", &splatIdx, splatFiles[0], 0);
         igEnd();
 
         igRender();
@@ -520,8 +570,6 @@ void render(const AppState *app, float dt) {
         wgpuRenderPassEncoderEnd(renderPass);
         wgpuRenderPassEncoderRelease(renderPass);
     }
-
-
 
     // Encode and submit
     WGPUCommandBuffer command = wgpuCommandEncoderFinish(encoder, &(WGPUCommandBufferDescriptor) {
