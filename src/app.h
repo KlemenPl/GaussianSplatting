@@ -25,6 +25,9 @@
 
 #include "wgpu-utils.h"
 
+#include "imgui.h"
+
+
 typedef struct AppState {
     GLFWwindow *window;
     WGPUInstance instance;
@@ -247,6 +250,24 @@ int main(int argc, const char **argv) {
 
     inputInit(window);
 
+
+    igCreateContext(NULL);
+    ImGui_ImplGlfw_InitForOther(window, true);
+    igStyleColorsDark(NULL);
+
+    ImGui_ImplWGPU_InitInfo initInfo = {
+        .Device = state.device,
+        .NumFramesInFlight = 3,
+        .RenderTargetFormat = surfaceCapabilities.formats[0],
+        .DepthStencilFormat = WGPUTextureFormat_Undefined,
+        .PipelineMultisampleState = (WGPUMultisampleState) {
+            .count = 1,
+            .mask = UINT32_MAX,
+        }
+    };
+    ImGui_ImplWGPU_Init(&initInfo);
+
+
     int status = 0;
     if (config.init) status = config.init(&state, argc, argv);
     if (status != 0) {
@@ -263,6 +284,17 @@ int main(int argc, const char **argv) {
         glfwSetWindowTitle(window, titleBuf);
         inputUpdate();
         glfwPollEvents();
+
+        int width, height;
+        glfwGetFramebufferSize(window, &width, &height);
+        if (width != config.width || height != config.height) {
+            config.width = width;
+            config.height = height;
+            ImGui_ImplWGPU_InvalidateDeviceObjects();
+            wgpuSurfaceUnconfigure(state.surface);
+            wgpuSurfaceConfigure(state.surface, &state.config);
+            ImGui_ImplWGPU_CreateDeviceObjects();
+        }
 
         if (config.update) config.update(&state, deltaTime);
 
@@ -293,6 +325,10 @@ int main(int argc, const char **argv) {
         }
         WGPUTextureView view = wgpuTextureCreateView(surfaceTexture.texture, NULL);
         state.view = view;
+
+        ImGui_ImplWGPU_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        igNewFrame();
 
         if (config.render) config.render(&state, deltaTime);
 

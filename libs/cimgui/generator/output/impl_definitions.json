@@ -1,0 +1,567 @@
+{
+  "ImGui_ImplGlfw_CharCallback": [
+    {
+      "args": "(GLFWwindow* window,unsigned int c)",
+      "argsT": [
+        {
+          "name": "window",
+          "type": "GLFWwindow*"
+        },
+        {
+          "name": "c",
+          "type": "unsigned int"
+        }
+      ],
+      "argsoriginal": "(GLFWwindow* window,unsigned int c)",
+      "call_args": "(window,c)",
+      "cimguiname": "ImGui_ImplGlfw_CharCallback",
+      "defaults": {},
+      "funcname": "ImGui_ImplGlfw_CharCallback",
+      "location": "imgui_impl_glfw:61",
+      "ov_cimguiname": "ImGui_ImplGlfw_CharCallback",
+      "ret": "void",
+      "signature": "(GLFWwindow*,unsigned int)",
+      "stname": ""
+    }
+  ],
+  "ImGui_ImplGlfw_CursorEnterCallback": [
+    {
+      "args": "(GLFWwindow* window,int entered)",
+      "argsT": [
+        {
+          "name": "window",
+          "type": "GLFWwindow*"
+        },
+        {
+          "name": "entered",
+          "type": "int"
+        }
+      ],
+      "argsoriginal": "(GLFWwindow* window,int entered)",
+      "call_args": "(window,entered)",
+      "cimguiname": "ImGui_ImplGlfw_CursorEnterCallback",
+      "defaults": {},
+      "funcname": "ImGui_ImplGlfw_CursorEnterCallback",
+      "location": "imgui_impl_glfw:56",
+      "ov_cimguiname": "ImGui_ImplGlfw_CursorEnterCallback",
+      "ret": "void",
+      "signature": "(GLFWwindow*,int)",
+      "stname": ""
+    }
+  ],
+  "ImGui_ImplGlfw_CursorPosCallback": [
+    {
+      "args": "(GLFWwindow* window,double x,double y)",
+      "argsT": [
+        {
+          "name": "window",
+          "type": "GLFWwindow*"
+        },
+        {
+          "name": "x",
+          "type": "double"
+        },
+        {
+          "name": "y",
+          "type": "double"
+        }
+      ],
+      "argsoriginal": "(GLFWwindow* window,double x,double y)",
+      "call_args": "(window,x,y)",
+      "cimguiname": "ImGui_ImplGlfw_CursorPosCallback",
+      "defaults": {},
+      "funcname": "ImGui_ImplGlfw_CursorPosCallback",
+      "location": "imgui_impl_glfw:57",
+      "ov_cimguiname": "ImGui_ImplGlfw_CursorPosCallback",
+      "ret": "void",
+      "signature": "(GLFWwindow*,double,double)",
+      "stname": ""
+    }
+  ],
+  "ImGui_ImplGlfw_InitForOpenGL": [
+    {
+      "args": "(GLFWwindow* window,bool install_callbacks)",
+      "argsT": [
+        {
+          "name": "window",
+          "type": "GLFWwindow*"
+        },
+        {
+          "name": "install_callbacks",
+          "type": "bool"
+        }
+      ],
+      "argsoriginal": "(GLFWwindow* window,bool install_callbacks)",
+      "call_args": "(window,install_callbacks)",
+      "cimguiname": "ImGui_ImplGlfw_InitForOpenGL",
+      "defaults": {},
+      "funcname": "ImGui_ImplGlfw_InitForOpenGL",
+      "location": "imgui_impl_glfw:32",
+      "ov_cimguiname": "ImGui_ImplGlfw_InitForOpenGL",
+      "ret": "bool",
+      "signature": "(GLFWwindow*,bool)",
+      "stname": ""
+    }
+  ],
+  "ImGui_ImplGlfw_InitForOther": [
+    {
+      "args": "(GLFWwindow* window,bool install_callbacks)",
+      "argsT": [
+        {
+          "name": "window",
+          "type": "GLFWwindow*"
+        },
+        {
+          "name": "install_callbacks",
+          "type": "bool"
+        }
+      ],
+      "argsoriginal": "(GLFWwindow* window,bool install_callbacks)",
+      "call_args": "(window,install_callbacks)",
+      "cimguiname": "ImGui_ImplGlfw_InitForOther",
+      "defaults": {},
+      "funcname": "ImGui_ImplGlfw_InitForOther",
+      "location": "imgui_impl_glfw:34",
+      "ov_cimguiname": "ImGui_ImplGlfw_InitForOther",
+      "ret": "bool",
+      "signature": "(GLFWwindow*,bool)",
+      "stname": ""
+    }
+  ],
+  "ImGui_ImplGlfw_InitForVulkan": [
+    {
+      "args": "(GLFWwindow* window,bool install_callbacks)",
+      "argsT": [
+        {
+          "name": "window",
+          "type": "GLFWwindow*"
+        },
+        {
+          "name": "install_callbacks",
+          "type": "bool"
+        }
+      ],
+      "argsoriginal": "(GLFWwindow* window,bool install_callbacks)",
+      "call_args": "(window,install_callbacks)",
+      "cimguiname": "ImGui_ImplGlfw_InitForVulkan",
+      "defaults": {},
+      "funcname": "ImGui_ImplGlfw_InitForVulkan",
+      "location": "imgui_impl_glfw:33",
+      "ov_cimguiname": "ImGui_ImplGlfw_InitForVulkan",
+      "ret": "bool",
+      "signature": "(GLFWwindow*,bool)",
+      "stname": ""
+    }
+  ],
+  "ImGui_ImplGlfw_InstallCallbacks": [
+    {
+      "args": "(GLFWwindow* window)",
+      "argsT": [
+        {
+          "name": "window",
+          "type": "GLFWwindow*"
+        }
+      ],
+      "argsoriginal": "(GLFWwindow* window)",
+      "call_args": "(window)",
+      "cimguiname": "ImGui_ImplGlfw_InstallCallbacks",
+      "defaults": {},
+      "funcname": "ImGui_ImplGlfw_InstallCallbacks",
+      "location": "imgui_impl_glfw:47",
+      "ov_cimguiname": "ImGui_ImplGlfw_InstallCallbacks",
+      "ret": "void",
+      "signature": "(GLFWwindow*)",
+      "stname": ""
+    }
+  ],
+  "ImGui_ImplGlfw_KeyCallback": [
+    {
+      "args": "(GLFWwindow* window,int key,int scancode,int action,int mods)",
+      "argsT": [
+        {
+          "name": "window",
+          "type": "GLFWwindow*"
+        },
+        {
+          "name": "key",
+          "type": "int"
+        },
+        {
+          "name": "scancode",
+          "type": "int"
+        },
+        {
+          "name": "action",
+          "type": "int"
+        },
+        {
+          "name": "mods",
+          "type": "int"
+        }
+      ],
+      "argsoriginal": "(GLFWwindow* window,int key,int scancode,int action,int mods)",
+      "call_args": "(window,key,scancode,action,mods)",
+      "cimguiname": "ImGui_ImplGlfw_KeyCallback",
+      "defaults": {},
+      "funcname": "ImGui_ImplGlfw_KeyCallback",
+      "location": "imgui_impl_glfw:60",
+      "ov_cimguiname": "ImGui_ImplGlfw_KeyCallback",
+      "ret": "void",
+      "signature": "(GLFWwindow*,int,int,int,int)",
+      "stname": ""
+    }
+  ],
+  "ImGui_ImplGlfw_MonitorCallback": [
+    {
+      "args": "(GLFWmonitor* monitor,int event)",
+      "argsT": [
+        {
+          "name": "monitor",
+          "type": "GLFWmonitor*"
+        },
+        {
+          "name": "event",
+          "type": "int"
+        }
+      ],
+      "argsoriginal": "(GLFWmonitor* monitor,int event)",
+      "call_args": "(monitor,event)",
+      "cimguiname": "ImGui_ImplGlfw_MonitorCallback",
+      "defaults": {},
+      "funcname": "ImGui_ImplGlfw_MonitorCallback",
+      "location": "imgui_impl_glfw:62",
+      "ov_cimguiname": "ImGui_ImplGlfw_MonitorCallback",
+      "ret": "void",
+      "signature": "(GLFWmonitor*,int)",
+      "stname": ""
+    }
+  ],
+  "ImGui_ImplGlfw_MouseButtonCallback": [
+    {
+      "args": "(GLFWwindow* window,int button,int action,int mods)",
+      "argsT": [
+        {
+          "name": "window",
+          "type": "GLFWwindow*"
+        },
+        {
+          "name": "button",
+          "type": "int"
+        },
+        {
+          "name": "action",
+          "type": "int"
+        },
+        {
+          "name": "mods",
+          "type": "int"
+        }
+      ],
+      "argsoriginal": "(GLFWwindow* window,int button,int action,int mods)",
+      "call_args": "(window,button,action,mods)",
+      "cimguiname": "ImGui_ImplGlfw_MouseButtonCallback",
+      "defaults": {},
+      "funcname": "ImGui_ImplGlfw_MouseButtonCallback",
+      "location": "imgui_impl_glfw:58",
+      "ov_cimguiname": "ImGui_ImplGlfw_MouseButtonCallback",
+      "ret": "void",
+      "signature": "(GLFWwindow*,int,int,int)",
+      "stname": ""
+    }
+  ],
+  "ImGui_ImplGlfw_NewFrame": [
+    {
+      "args": "()",
+      "argsT": [],
+      "argsoriginal": "()",
+      "call_args": "()",
+      "cimguiname": "ImGui_ImplGlfw_NewFrame",
+      "defaults": {},
+      "funcname": "ImGui_ImplGlfw_NewFrame",
+      "location": "imgui_impl_glfw:36",
+      "ov_cimguiname": "ImGui_ImplGlfw_NewFrame",
+      "ret": "void",
+      "signature": "()",
+      "stname": ""
+    }
+  ],
+  "ImGui_ImplGlfw_RestoreCallbacks": [
+    {
+      "args": "(GLFWwindow* window)",
+      "argsT": [
+        {
+          "name": "window",
+          "type": "GLFWwindow*"
+        }
+      ],
+      "argsoriginal": "(GLFWwindow* window)",
+      "call_args": "(window)",
+      "cimguiname": "ImGui_ImplGlfw_RestoreCallbacks",
+      "defaults": {},
+      "funcname": "ImGui_ImplGlfw_RestoreCallbacks",
+      "location": "imgui_impl_glfw:48",
+      "ov_cimguiname": "ImGui_ImplGlfw_RestoreCallbacks",
+      "ret": "void",
+      "signature": "(GLFWwindow*)",
+      "stname": ""
+    }
+  ],
+  "ImGui_ImplGlfw_ScrollCallback": [
+    {
+      "args": "(GLFWwindow* window,double xoffset,double yoffset)",
+      "argsT": [
+        {
+          "name": "window",
+          "type": "GLFWwindow*"
+        },
+        {
+          "name": "xoffset",
+          "type": "double"
+        },
+        {
+          "name": "yoffset",
+          "type": "double"
+        }
+      ],
+      "argsoriginal": "(GLFWwindow* window,double xoffset,double yoffset)",
+      "call_args": "(window,xoffset,yoffset)",
+      "cimguiname": "ImGui_ImplGlfw_ScrollCallback",
+      "defaults": {},
+      "funcname": "ImGui_ImplGlfw_ScrollCallback",
+      "location": "imgui_impl_glfw:59",
+      "ov_cimguiname": "ImGui_ImplGlfw_ScrollCallback",
+      "ret": "void",
+      "signature": "(GLFWwindow*,double,double)",
+      "stname": ""
+    }
+  ],
+  "ImGui_ImplGlfw_SetCallbacksChainForAllWindows": [
+    {
+      "args": "(bool chain_for_all_windows)",
+      "argsT": [
+        {
+          "name": "chain_for_all_windows",
+          "type": "bool"
+        }
+      ],
+      "argsoriginal": "(bool chain_for_all_windows)",
+      "call_args": "(chain_for_all_windows)",
+      "cimguiname": "ImGui_ImplGlfw_SetCallbacksChainForAllWindows",
+      "defaults": {},
+      "funcname": "ImGui_ImplGlfw_SetCallbacksChainForAllWindows",
+      "location": "imgui_impl_glfw:52",
+      "ov_cimguiname": "ImGui_ImplGlfw_SetCallbacksChainForAllWindows",
+      "ret": "void",
+      "signature": "(bool)",
+      "stname": ""
+    }
+  ],
+  "ImGui_ImplGlfw_Shutdown": [
+    {
+      "args": "()",
+      "argsT": [],
+      "argsoriginal": "()",
+      "call_args": "()",
+      "cimguiname": "ImGui_ImplGlfw_Shutdown",
+      "defaults": {},
+      "funcname": "ImGui_ImplGlfw_Shutdown",
+      "location": "imgui_impl_glfw:35",
+      "ov_cimguiname": "ImGui_ImplGlfw_Shutdown",
+      "ret": "void",
+      "signature": "()",
+      "stname": ""
+    }
+  ],
+  "ImGui_ImplGlfw_Sleep": [
+    {
+      "args": "(int milliseconds)",
+      "argsT": [
+        {
+          "name": "milliseconds",
+          "type": "int"
+        }
+      ],
+      "argsoriginal": "(int milliseconds)",
+      "call_args": "(milliseconds)",
+      "cimguiname": "ImGui_ImplGlfw_Sleep",
+      "defaults": {},
+      "funcname": "ImGui_ImplGlfw_Sleep",
+      "location": "imgui_impl_glfw:65",
+      "ov_cimguiname": "ImGui_ImplGlfw_Sleep",
+      "ret": "void",
+      "signature": "(int)",
+      "stname": ""
+    }
+  ],
+  "ImGui_ImplGlfw_WindowFocusCallback": [
+    {
+      "args": "(GLFWwindow* window,int focused)",
+      "argsT": [
+        {
+          "name": "window",
+          "type": "GLFWwindow*"
+        },
+        {
+          "name": "focused",
+          "type": "int"
+        }
+      ],
+      "argsoriginal": "(GLFWwindow* window,int focused)",
+      "call_args": "(window,focused)",
+      "cimguiname": "ImGui_ImplGlfw_WindowFocusCallback",
+      "defaults": {},
+      "funcname": "ImGui_ImplGlfw_WindowFocusCallback",
+      "location": "imgui_impl_glfw:55",
+      "ov_cimguiname": "ImGui_ImplGlfw_WindowFocusCallback",
+      "ret": "void",
+      "signature": "(GLFWwindow*,int)",
+      "stname": ""
+    }
+  ],
+  "ImGui_ImplWGPU_CreateDeviceObjects": [
+    {
+      "args": "()",
+      "argsT": [],
+      "argsoriginal": "()",
+      "call_args": "()",
+      "cimguiname": "ImGui_ImplWGPU_CreateDeviceObjects",
+      "defaults": {},
+      "funcname": "ImGui_ImplWGPU_CreateDeviceObjects",
+      "location": "imgui_impl_wgpu:57",
+      "ov_cimguiname": "ImGui_ImplWGPU_CreateDeviceObjects",
+      "ret": "bool",
+      "signature": "()",
+      "stname": ""
+    }
+  ],
+  "ImGui_ImplWGPU_Init": [
+    {
+      "args": "(ImGui_ImplWGPU_InitInfo* init_info)",
+      "argsT": [
+        {
+          "name": "init_info",
+          "type": "ImGui_ImplWGPU_InitInfo*"
+        }
+      ],
+      "argsoriginal": "(ImGui_ImplWGPU_InitInfo* init_info)",
+      "call_args": "(init_info)",
+      "cimguiname": "ImGui_ImplWGPU_Init",
+      "defaults": {},
+      "funcname": "ImGui_ImplWGPU_Init",
+      "location": "imgui_impl_wgpu:51",
+      "ov_cimguiname": "ImGui_ImplWGPU_Init",
+      "ret": "bool",
+      "signature": "(ImGui_ImplWGPU_InitInfo*)",
+      "stname": ""
+    }
+  ],
+  "ImGui_ImplWGPU_InitInfo_ImGui_ImplWGPU_InitInfo": [
+    {
+      "args": "()",
+      "argsT": [],
+      "argsoriginal": "()",
+      "call_args": "()",
+      "cimguiname": "ImGui_ImplWGPU_InitInfo_ImGui_ImplWGPU_InitInfo",
+      "constructor": true,
+      "defaults": {},
+      "funcname": "ImGui_ImplWGPU_InitInfo",
+      "location": "imgui_impl_wgpu:42",
+      "ov_cimguiname": "ImGui_ImplWGPU_InitInfo_ImGui_ImplWGPU_InitInfo",
+      "signature": "()",
+      "stname": "ImGui_ImplWGPU_InitInfo"
+    }
+  ],
+  "ImGui_ImplWGPU_InitInfo_destroy": [
+    {
+      "args": "(ImGui_ImplWGPU_InitInfo* self)",
+      "argsT": [
+        {
+          "name": "self",
+          "type": "ImGui_ImplWGPU_InitInfo*"
+        }
+      ],
+      "call_args": "(self)",
+      "cimguiname": "ImGui_ImplWGPU_InitInfo_destroy",
+      "defaults": {},
+      "destructor": true,
+      "location": "imgui_impl_wgpu:42",
+      "ov_cimguiname": "ImGui_ImplWGPU_InitInfo_destroy",
+      "ret": "void",
+      "signature": "(ImGui_ImplWGPU_InitInfo*)",
+      "stname": "ImGui_ImplWGPU_InitInfo"
+    }
+  ],
+  "ImGui_ImplWGPU_InvalidateDeviceObjects": [
+    {
+      "args": "()",
+      "argsT": [],
+      "argsoriginal": "()",
+      "call_args": "()",
+      "cimguiname": "ImGui_ImplWGPU_InvalidateDeviceObjects",
+      "defaults": {},
+      "funcname": "ImGui_ImplWGPU_InvalidateDeviceObjects",
+      "location": "imgui_impl_wgpu:58",
+      "ov_cimguiname": "ImGui_ImplWGPU_InvalidateDeviceObjects",
+      "ret": "void",
+      "signature": "()",
+      "stname": ""
+    }
+  ],
+  "ImGui_ImplWGPU_NewFrame": [
+    {
+      "args": "()",
+      "argsT": [],
+      "argsoriginal": "()",
+      "call_args": "()",
+      "cimguiname": "ImGui_ImplWGPU_NewFrame",
+      "defaults": {},
+      "funcname": "ImGui_ImplWGPU_NewFrame",
+      "location": "imgui_impl_wgpu:53",
+      "ov_cimguiname": "ImGui_ImplWGPU_NewFrame",
+      "ret": "void",
+      "signature": "()",
+      "stname": ""
+    }
+  ],
+  "ImGui_ImplWGPU_RenderDrawData": [
+    {
+      "args": "(ImDrawData* draw_data,WGPURenderPassEncoder pass_encoder)",
+      "argsT": [
+        {
+          "name": "draw_data",
+          "type": "ImDrawData*"
+        },
+        {
+          "name": "pass_encoder",
+          "type": "WGPURenderPassEncoder"
+        }
+      ],
+      "argsoriginal": "(ImDrawData* draw_data,WGPURenderPassEncoder pass_encoder)",
+      "call_args": "(draw_data,pass_encoder)",
+      "cimguiname": "ImGui_ImplWGPU_RenderDrawData",
+      "defaults": {},
+      "funcname": "ImGui_ImplWGPU_RenderDrawData",
+      "location": "imgui_impl_wgpu:54",
+      "ov_cimguiname": "ImGui_ImplWGPU_RenderDrawData",
+      "ret": "void",
+      "signature": "(ImDrawData*,WGPURenderPassEncoder)",
+      "stname": ""
+    }
+  ],
+  "ImGui_ImplWGPU_Shutdown": [
+    {
+      "args": "()",
+      "argsT": [],
+      "argsoriginal": "()",
+      "call_args": "()",
+      "cimguiname": "ImGui_ImplWGPU_Shutdown",
+      "defaults": {},
+      "funcname": "ImGui_ImplWGPU_Shutdown",
+      "location": "imgui_impl_wgpu:52",
+      "ov_cimguiname": "ImGui_ImplWGPU_Shutdown",
+      "ret": "void",
+      "signature": "()",
+      "stname": ""
+    }
+  ]
+}

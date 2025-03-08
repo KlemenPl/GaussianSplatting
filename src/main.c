@@ -352,7 +352,9 @@ void render(const AppState *app, float dt) {
     if (inputIsKeyPressed(GLFW_KEY_ESCAPE)) {
         exit(0);
     }
-    if (inputIsButtonDown(GLFW_MOUSE_BUTTON_LEFT)) {
+    bool mouseCaptured = igGetIO()->WantCaptureMouse;
+    bool keyboardCaptured = igGetIO()->WantCaptureKeyboard;
+    if (!mouseCaptured && inputIsButtonDown(GLFW_MOUSE_BUTTON_LEFT)) {
         const float mouseSpeed = 10.0f;
         vec2 mouseDelta;
         inputGetMouseDelta(mouseDelta);
@@ -364,7 +366,7 @@ void render(const AppState *app, float dt) {
     }
     vec2 wheelDelta;
     inputGetMouseWheelDelta(wheelDelta);
-    if (wheelDelta[1] != 0.0) {
+    if (!mouseCaptured && wheelDelta[1] != 0.0) {
         arcballCameraZoom(&camera, -wheelDelta[1] * 0.2f);
         cameraUpdated = true;
     }
@@ -506,9 +508,18 @@ void render(const AppState *app, float dt) {
         //wgpuRenderPassEncoderSetVertexBuffer(renderPass, 0, vertexInBuffer, 0, wgpuBufferGetSize(vertexInBuffer));
         wgpuRenderPassEncoderDraw(renderPass, 4, numSplats, 0, 0);
 
+
+
+
+        static bool showDemo = true;
+        igShowDemoWindow(&showDemo);
+        igRender();
+        ImGui_ImplWGPU_RenderDrawData(igGetDrawData(), renderPass);
+
         wgpuRenderPassEncoderEnd(renderPass);
         wgpuRenderPassEncoderRelease(renderPass);
     }
+
 
 
     // Encode and submit
@@ -550,8 +561,8 @@ void render(const AppState *app, float dt) {
 
 AppConfig appMain() {
      return (AppConfig) {
-        .width = 640,
-        .height = 480,
+        .width = 1280,
+        .height = 720,
         .title = "GuassianSplatting",
         .init = init,
         .deinit = deinit,

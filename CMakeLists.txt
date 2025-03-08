@@ -6,8 +6,9 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 
 add_compile_options(-Wall -pedantic)
 
-add_subdirectory(cglm)
-add_subdirectory(webgpu)
+add_subdirectory(libs/cglm)
+add_subdirectory(libs/webgpu)
+include(libs/cimgui.cmake)
 
 if (WIN32)
     add_definitions(-DGLFW_EXPOSE_NATIVE_WIN32)
@@ -29,12 +30,13 @@ if (EMSCRIPTEN)
     add_library(glfw INTERFACE)
     target_link_options(glfw INTERFACE -sUSE_GLFW=3)
 else ()
-    add_subdirectory(glfw3)
+    add_subdirectory(libs/glfw3)
 endif ()
 
 add_executable(GaussianSplatting
         src/app.h
         src/camera.h
+        src/imgui.h
         src/input.c
         src/input.h
         src/main.c
@@ -45,6 +47,8 @@ add_executable(GaussianSplatting
 )
 
 target_link_libraries(GaussianSplatting PRIVATE webgpu cglm glfw ${OS_LIBRARIES})
+target_link_libraries(GaussianSplatting PRIVATE ${CIMGUI_LIBRARY})
+target_compile_definitions(GaussianSplatting PRIVATE CIMGUI_USE_GLFW, CIMGUI_USE_WGPU)
 target_copy_webgpu_binaries(GaussianSplatting)
 
 if (EMSCRIPTEN)
