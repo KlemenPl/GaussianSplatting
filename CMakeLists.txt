@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.25)
+cmake_minimum_required(VERSION 3.15)
 project(GaussianSplatting)
 
 set(CMAKE_C_STANDARD 11)
@@ -13,7 +13,7 @@ include(libs/cimgui.cmake)
 if (WIN32)
     add_definitions(-DGLFW_EXPOSE_NATIVE_WIN32)
     set(OS_LIBRARIES d3dcompiler ws2_32 userenv bcrypt ntdll opengl32 Propsys RuntimeObject)
-elseif(UNIX AND NOT APPLE)
+elseif(UNIX AND NOT APPLE AND NOT EMSCRIPTEN)
     add_definitions(-DGLFW_EXPOSE_NATIVE_X11)
     add_definitions(-DGLFW_EXPOSE_NATIVE_WAYLAND)
     set(OS_LIBRARIES "-lm -ldl")
@@ -48,10 +48,14 @@ add_executable(GaussianSplatting
 
 target_link_libraries(GaussianSplatting PRIVATE webgpu cglm glfw ${OS_LIBRARIES})
 target_link_libraries(GaussianSplatting PRIVATE ${CIMGUI_LIBRARY})
-target_compile_definitions(GaussianSplatting PRIVATE CIMGUI_USE_GLFW, CIMGUI_USE_WGPU)
+target_compile_definitions(GaussianSplatting PRIVATE CIMGUI_USE_GLFW CIMGUI_USE_WGPU)
 target_copy_webgpu_binaries(GaussianSplatting)
 
 if (EMSCRIPTEN)
     # Generate a full web page rather than a simple WebAssembly module
-    set_target_properties(GaussianSplatting PROPERTIES SUFFIX ".html")
+    set_target_properties(GaussianSplatting PROPERTIES
+            SUFFIX ".html"
+            LINK_FLAGS "-lidbfs.js -O3 --shell-file ../index.html -sFORCE_FILESYSTEM=1 -sWASM=1 -sUSE_GLFW=3 -sUSE_WEBGPU=1"
+
+    )
 endif()

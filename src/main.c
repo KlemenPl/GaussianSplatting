@@ -607,8 +607,8 @@ AppConfig appMain() {
         .width = 1280,
         .height = 720,
         .title = "GuassianSplatting",
-        .init = init,
-        .deinit = deinit,
-        .render = render,
+        .init = (AppInitFn) init,
+        .deinit = (AppDeInitFn) deinit,
+        .render = (AppRenderFn) render,
     };
 }

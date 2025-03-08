@@ -10,18 +10,26 @@
 #include <stdio.h>
 #include <signal.h>
 
-#ifdef __EMSCRIPTEN__
-#include <emscripten.h>
-#include <emscripten/html5.h>
-#include <emscripten/html5_webgpu.h>
-#endif
-
 #include "input.h"
 
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
+#ifndef __EMSCRIPTEN__
 #include <GLFW/glfw3native.h>
+#endif
 #include <webgpu/webgpu.h>
+
+#ifdef __EMSCRIPTEN__
+typedef struct WGPUSwapChain WGPUSwapChain;
+typedef struct WGPUSurfaceDescriptorFromCanvasHTMLSelector {
+    WGPUChainedStruct chain;
+    char const * selector;
+} WGPUSurfaceDescriptorFromCanvasHTMLSelector WGPU_STRUCTURE_ATTRIBUTE;
+#define WGPUSType_SurfaceDescriptorFromCanvasHTMLSelector 0x00000004
+#include <emscripten.h>
+#include <emscripten/html5.h>
+#include <emscripten/html5_webgpu.h>
+#endif
 
 #include "wgpu-utils.h"
 
@@ -177,6 +185,27 @@ static bool _initWebGPU(AppState *state) {
                 },
         });
   }
+#elif defined(__EMSCRIPTEN__)
+      // For Emscripten/Web, we use the HTML canvas
+  //EmscriptenWebGPUContextAttributes attrs;
+  //attrs.powerPreference = EM_WEBGPU_POWER_PREFERENCE_HIGH_PERFORMANCE;
+  //attrs.failIfMajorPerformanceCaveat = false;
+
+  //EMSCRIPTEN_WEBGPU_CONTEXT_HANDLE context = emscripten_webgpu_create_context("canvas", &attrs);
+
+  //WGPUDevice device = emscripten_webgpu_get_device();
+
+  // Create surface from canvas
+  state->surface = wgpuInstanceCreateSurface(
+      state->instance,
+      &(WGPUSurfaceDescriptor){
+          .nextInChain = (WGPUChainedStruct*)&(WGPUSurfaceDescriptorFromCanvasHTMLSelector){
+              .chain = {
+                  .sType = WGPUSType_SurfaceDescriptorFromCanvasHTMLSelector,
+              },
+              .selector = "#canvas", // The ID of your canvas element
+          },
+      });
 #else
 #error "Unsupported GLFW native platform"
 #endif
@@ -224,8 +253,10 @@ int main(int argc, const char **argv) {
         .window = window,
     };
 
+#ifndef __EMSCRIPTEN__
     wgpuSetLogLevel(WGPULogLevel_Info);
     wgpuSetLogCallback(_wgpuLogCallback, NULL);
+#endif
     if (!_initWebGPU(&state)) {
         glfwTerminate();
         return 1;
@@ -337,7 +368,9 @@ int main(int argc, const char **argv) {
         wgpuTextureViewRelease(view);
         wgpuTextureRelease(surfaceTexture.texture);
 
+#ifndef __EMSCRIPTEN__
         wgpuDevicePoll(state.device, false, NULL);
+#endif
 
         prevFrame = currFrame;
         currFrame = glfwGetTime();

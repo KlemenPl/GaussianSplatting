@@ -2,12 +2,7 @@
 
 web:
 	mkdir -p build_web
-	cd build_web && \
-	emscripten emcmake cmake -DPLATFORM=Web -DCMAKE_BUILD_TYPE=Release .. && \
-	emscripten emmake make && \
-	mv PixelDefense.html index.html && \
-	rm -f ../PixelDefense.zip && \
-	zip ../PixelDefense.zip index.html PixelDefense.*
+	./build_web.sh
 
 desktop:
 	mkdir -p build_desktop
