@@ -43,7 +43,6 @@ uint32_t numSplats;
 
 WGPUQueue queue;
 
-WGPUBindGroupLayout bindGroupLayout;
 WGPUBindGroup bindGroup;
 WGPUPipelineLayout pipelineLayout;
 
@@ -80,7 +79,6 @@ int init(const AppState *app, int argc, const char **argv) {
     return 0;
 }
 void deinit(const AppState *app) {
-    wgpuBindGroupLayoutRelease(bindGroupLayout);
     wgpuBindGroupRelease(bindGroup);
     wgpuPipelineLayoutRelease(pipelineLayout);
 
@@ -203,10 +201,7 @@ void loadSplat(const AppState *app, const char *splatFile) {
     });
     free(points);
 
-    if (bindGroupLayout) {
-        wgpuBindGroupLayoutRelease(bindGroupLayout);
-    }
-    bindGroupLayout = wgpuDeviceCreateBindGroupLayout(app->device, &(WGPUBindGroupLayoutDescriptor) {
+    WGPUBindGroupLayout bindGroupLayout = wgpuDeviceCreateBindGroupLayout(app->device, &(WGPUBindGroupLayoutDescriptor) {
         .entryCount = 5,
         .entries = (WGPUBindGroupLayoutEntry[]) {
             [0] = {
@@ -305,6 +300,7 @@ void loadSplat(const AppState *app, const char *splatFile) {
         },
         .label = "Pipeline Layout",
     });
+    wgpuBindGroupLayoutRelease(bindGroupLayout);
 
     const char *shaderSource = readFile("shader.wgsl");
     WGPUShaderModule shaderModule = wgpuDeviceCreateShaderModule(app->device, &(WGPUShaderModuleDescriptor) {
