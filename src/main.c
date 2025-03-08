@@ -372,7 +372,7 @@ void render(const AppState *app, float dt) {
     }
     arcballCameraUpdate(&camera);
 
-    Uniform uniform = {
+    static Uniform uniform = {
         .scale = 0.125f,
     };
     glm_mat4_copy(camera.viewProj, uniform.viewProj);
@@ -510,9 +510,10 @@ void render(const AppState *app, float dt) {
 
 
 
+        igBegin("GaussianSplatting", NULL, 0);
+        igSliderFloat("Splat size", &uniform.scale, 0.01f, 1.0f, "%.2f", 0);
+        igEnd();
 
-        static bool showDemo = true;
-        igShowDemoWindow(&showDemo);
         igRender();
         ImGui_ImplWGPU_RenderDrawData(igGetDrawData(), renderPass);
 
