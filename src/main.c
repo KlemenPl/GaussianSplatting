@@ -49,6 +49,7 @@ WGPUPipelineLayout pipelineLayout;
 WGPUComputePipeline transformPipeline;
 WGPUComputePipeline sortPipeline;
 
+WGPUShaderModule shaderModule;
 WGPUBuffer uniformBuffer;
 WGPUBuffer sortUniformBuffer;
 WGPUBuffer stagingSortUniformBuffer;
@@ -59,6 +60,17 @@ WGPURenderPipeline renderPipeline;
 
 int init(const AppState *app, int argc, const char **argv) {
     queue = wgpuDeviceGetQueue(app->device);
+
+    const char *shaderSource = readFile("shader.wgsl");
+    shaderModule = wgpuDeviceCreateShaderModule(app->device, &(WGPUShaderModuleDescriptor) {
+        .nextInChain = (WGPUChainedStruct*) &(WGPUShaderSourceWGSL) {
+            .chain = (WGPUChainedStruct) {
+                .sType = WGPUSType_ShaderSourceWGSL,
+            },
+            .code = {shaderSource, strlen(shaderSource)},
+        },
+    });
+    free(shaderSource);
 
     uniformBuffer = wgpuDeviceCreateBuffer(app->device, &(WGPUBufferDescriptor) {
         .label = "Uniform Buffer",
@@ -88,6 +100,8 @@ void deinit(const AppState *app) {
     wgpuBufferRelease(sortedIndexBuffer);
     wgpuBufferRelease(transformedPosBuffer);
     wgpuBufferRelease(splatsBuffer);
+
+    wgpuShaderModuleRelease(shaderModule);
 
     wgpuComputePipelineRelease(transformPipeline);
     wgpuComputePipelineRelease(sortPipeline);
@@ -302,17 +316,6 @@ void loadSplat(const AppState *app, const char *splatFile) {
     });
     wgpuBindGroupLayoutRelease(bindGroupLayout);
 
-    const char *shaderSource = readFile("shader.wgsl");
-    WGPUShaderModule shaderModule = wgpuDeviceCreateShaderModule(app->device, &(WGPUShaderModuleDescriptor) {
-        .nextInChain = (WGPUChainedStruct*) &(WGPUShaderSourceWGSL) {
-            .chain = (WGPUChainedStruct) {
-                .sType = WGPUSType_ShaderSourceWGSL,
-            },
-            .code = {shaderSource, strlen(shaderSource)},
-        },
-    });
-    free(shaderSource);
-
     if (transformPipeline) {
         wgpuComputePipelineRelease(transformPipeline);
     }
@@ -373,11 +376,6 @@ void loadSplat(const AppState *app, const char *splatFile) {
         .multisample.mask = ~0u,
         .multisample.alphaToCoverageEnabled = false,
     });
-
-
-    wgpuShaderModuleRelease(shaderModule);
-
-
 }
 
 void render(const AppState *app, float dt) {
