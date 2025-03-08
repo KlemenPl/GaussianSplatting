@@ -382,7 +382,7 @@ void render(const AppState *app, float dt) {
 
     wgpuQueueWriteBuffer(queue, uniformBuffer, 0, &uniform, sizeof(uniform));
     // Transform pass
-    cameraUpdated = true;
+    //cameraUpdated = true;
     if (cameraUpdated) {
         WGPUComputePassEncoder transformPass = wgpuCommandEncoderBeginComputePass(encoder, NULL);
         wgpuComputePassEncoderSetPipeline(transformPass, transformPipeline);
