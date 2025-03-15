@@ -87,11 +87,11 @@ static void _wgpuLogCallback(WGPULogLevel level, WGPUStringView message, void *u
         default: break;
     }
 
+    fprintf(stderr, "WGPU [%s]: %s\n", logLevel, message);
     if (level < WGPULogLevel_Warn) {
         raise(SIGTRAP);
     }
 
-    fprintf(stderr, "WGPU [%s]: %s\n", logLevel, message);
 }
 
 
