@@ -129,7 +129,6 @@ static void mainLoop() {
     snprintf(titleBuf, sizeof(titleBuf), "%s [%.2f FPS | %.2f ms]", config.title, 1 / deltaTime, deltaTime * 1000.0f);
     glfwSetWindowTitle(state.window, titleBuf);
 
-    inputUpdate();
     glfwPollEvents();
 
     int width, height;
@@ -201,6 +200,16 @@ static void mainLoop() {
 
     prevFrame = currFrame;
     currFrame = glfwGetTime();
+
+    // Note: You know that feeling, when you are searching stackoverflow for answers
+    // and then you stumble upon your own question that exactly answers your question:
+    //
+    // Couldn't be me :/
+    // https://stackoverflow.com/questions/74955822/keyjustdown-implementation-in-emscripten-using-glfw3/74959249#74959249
+#ifdef __EMSCRIPTEN__
+    glfwSwapBuffers(state.window);
+#endif
+    inputUpdate();
 }
 
 int main(int argc, const char **argv) {
