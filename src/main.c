@@ -58,6 +58,22 @@ WGPUBuffer transformedPosBuffer;
 WGPUBuffer sortedIndexBuffer;
 WGPURenderPipeline renderPipeline;
 
+Splat *splats;
+vec4 *transformedPos;
+uint32_t *sortedIndex;
+
+int cmpTransformedPosZ(const void *a, const void *b) {
+    uint32_t idxA = *(const uint32_t *)a;
+    uint32_t idxB = *(const uint32_t *)b;
+
+    float zA = transformedPos[idxA][2];
+    float zB = transformedPos[idxB][2];
+
+    if (zA < zB) return 1;
+    if (zA > zB) return -1;
+    return 0;
+}
+
 int init(const AppState *app, int argc, const char **argv) {
     queue = wgpuDeviceGetQueue(app->device);
 
@@ -94,6 +110,10 @@ void deinit(const AppState *app) {
     wgpuBindGroupRelease(bindGroup);
     wgpuPipelineLayoutRelease(pipelineLayout);
 
+    free(splats);
+    free(transformedPos);
+    free(sortedIndex);
+
     wgpuBufferRelease(stagingSortUniformBuffer);
     wgpuBufferRelease(sortUniformBuffer);
     wgpuBufferRelease(uniformBuffer);
@@ -109,53 +129,6 @@ void deinit(const AppState *app) {
     wgpuQueueRelease(queue);
 }
 
-void compare(vec4 *positions, uint32_t *indices, uint32_t n, uint32_t i, uint32_t j) {
-    if (j >= n) return;
-    uint32_t iIdx = indices[i];
-    uint32_t jIdx = indices[j];
-    if (i < j && positions[jIdx][2] < positions[iIdx][2]) {
-        uint32_t tmp = indices[i];
-        indices[i] = indices[j];
-        indices[j] = tmp;
-    }
-}
-void sortCPU(vec4 *positions, uint32_t *indices, uint32_t n) {
-    for (uint32_t i = 0; i < n; i++) {
-        indices[i] = i;
-    }
-    for (uint32_t k = 2; (k >> 1) < n; k <<= 1) {
-        for (uint32_t i = 0; i < n; i++)
-            compare(positions, indices, n, i, i ^ (k - 1));
-        for (uint32_t j = k >> 1; 0 < j; j >>= 1) {
-            for (uint32_t i = 0; i < n; i++)
-                compare(positions, indices, n, i, i ^ j);
-        }
-    }
-
-}
-
-bool stagingMapped = false;
-WGPUBuffer stagingBuffer = 0;
-void mapBuffer(WGPUMapAsyncStatus status, void *userData) {
-    uint32_t posSize = wgpuBufferGetSize(transformedPosBuffer);
-    uint32_t indicesSize = wgpuBufferGetSize(sortedIndexBuffer);
-    const void *data = wgpuBufferGetMappedRange(stagingBuffer, 0, posSize + indicesSize);
-    vec4 *positions = (vec4 *)data;
-    uint32_t *indices = (char *)data + posSize;
-
-    uint32_t numIndices = indicesSize / sizeof(uint32_t);
-    //sortCPU(positions, indices, numPositions);
-    for (uint32_t i = 1; i < numIndices; i++) {
-        uint32_t j = indices[i - 1];
-        uint32_t k = indices[i];
-        //assert(positions[i - 1][2] <= positions[i][2]);
-        assert(positions[j][2] >= positions[k][2]);
-    }
-
-    wgpuBufferUnmap(stagingBuffer);
-    stagingMapped = false;
-}
-
 void loadSplat(const AppState *app, const char *splatFile) {
     FILE *f = fopen(splatFile, "rb");
     if (!f) {
@@ -166,7 +139,9 @@ void loadSplat(const AppState *app, const char *splatFile) {
     size_t fileSize = ftell(f);
     numSplats = fileSize / sizeof(SplatRaw);
     assert(fileSize % sizeof(SplatRaw) == 0 && "Invalid file length");
-    Splat *points = malloc(numSplats * sizeof(*points));
+    if (splats)
+        free(splats);
+    splats = malloc(numSplats * sizeof(*splats));
     fseek(f, 0, SEEK_SET);
 
     vec3 center = {0, 0, 0};
@@ -174,10 +149,10 @@ void loadSplat(const AppState *app, const char *splatFile) {
         SplatRaw splatRaw;
         fread(&splatRaw, sizeof(splatRaw), 1, f);
         glm_vec3_add(center, splatRaw.pos, center);
-        glm_vec3_copy(splatRaw.pos, points[idx].pos);
-        glm_vec3_copy(splatRaw.scale, points[idx].scale);
-        points[idx].color = splatRaw.color;
-        points[idx].rotation = splatRaw.rotation;
+        glm_vec3_copy(splatRaw.pos, splats[idx].pos);
+        glm_vec3_copy(splatRaw.scale, splats[idx].scale);
+        splats[idx].color = splatRaw.color;
+        splats[idx].rotation = splatRaw.rotation;
     }
     glm_vec3_div(center, (vec3){numSplats, numSplats, numSplats}, camera.center);
 
@@ -194,6 +169,11 @@ void loadSplat(const AppState *app, const char *splatFile) {
         wgpuBufferRelease(sortedIndexBuffer);
     }
 
+    if (transformedPos)
+        free(transformedPos);
+    if (sortedIndex)
+        free(sortedIndex);
+
 
     splatsBuffer = wgpuDeviceCreateBuffer(app->device, &(WGPUBufferDescriptor) {
         .label = "Splats Buffer",
@@ -201,19 +181,20 @@ void loadSplat(const AppState *app, const char *splatFile) {
         .size = numSplats * sizeof(Splat),
         .mappedAtCreation = false
     });
-    wgpuQueueWriteBuffer(queue, splatsBuffer, 0, points, numSplats * sizeof(Splat));
+    wgpuQueueWriteBuffer(queue, splatsBuffer, 0, splats, numSplats * sizeof(Splat));
 
     transformedPosBuffer = wgpuDeviceCreateBuffer(app->device, &(WGPUBufferDescriptor) {
         .label = "Transformed Positions",
-        .usage = WGPUBufferUsage_Storage | WGPUBufferUsage_Vertex | WGPUBufferUsage_CopySrc,
+        .usage = WGPUBufferUsage_Storage | WGPUBufferUsage_Vertex | WGPUBufferUsage_CopyDst,
         .size = numSplats * sizeof(vec4),
     });
+    transformedPos = malloc(numSplats * sizeof(vec4));
     sortedIndexBuffer = wgpuDeviceCreateBuffer(app->device, &(WGPUBufferDescriptor) {
         .label = "Sorted Indices",
-        .usage = WGPUBufferUsage_Storage | WGPUBufferUsage_Vertex | WGPUBufferUsage_CopySrc,
+        .usage = WGPUBufferUsage_Storage | WGPUBufferUsage_Vertex | WGPUBufferUsage_CopyDst,
         .size = numSplats * sizeof(uint32_t),
     });
-    free(points);
+    sortedIndex = malloc(numSplats * sizeof(uint32_t));
 
     WGPUBindGroupLayout bindGroupLayout = wgpuDeviceCreateBindGroupLayout(app->device, &(WGPUBindGroupLayoutDescriptor) {
         .entryCount = 5,
@@ -410,8 +391,10 @@ void render(const AppState *app, float dt) {
         changeSplat = false;
         cameraUpdated = true;
     }
-
     arcballCameraUpdate(&camera);
+
+    static bool gpuSort = true;
+    static bool alwaysSort = false;
 
 
     static Uniform uniform = {
@@ -425,18 +408,16 @@ void render(const AppState *app, float dt) {
     });
 
     wgpuQueueWriteBuffer(queue, uniformBuffer, 0, &uniform, sizeof(uniform));
-    // Transform pass
-    //cameraUpdated = true;
-    if (cameraUpdated) {
+
+    if (gpuSort && (alwaysSort || cameraUpdated)) {
+        // Transform pass
         WGPUComputePassEncoder transformPass = wgpuCommandEncoderBeginComputePass(encoder, NULL);
         wgpuComputePassEncoderSetPipeline(transformPass, transformPipeline);
         wgpuComputePassEncoderSetBindGroup(transformPass, 0, bindGroup, 0, NULL);
         wgpuComputePassEncoderDispatchWorkgroups(transformPass, (numSplats + 255) / 256, 1, 1);
         wgpuComputePassEncoderEnd(transformPass);
         wgpuComputePassEncoderRelease(transformPass);
-    }
-    // Sort pass
-    if (cameraUpdated) {
+        // Sort pass
         uint32_t uniformCount = 0;
         for (uint32_t k = 2; (k >> 1) < numSplats; k <<= 1) {
             uniformCount++;
@@ -467,56 +448,20 @@ void render(const AppState *app, float dt) {
             wgpuComputePassEncoderEnd(computePass);
             wgpuComputePassEncoderRelease(computePass);
         }
-
-        /*
-        for (uint32_t k = 2; k <= n; k <<= 1) {
-            for (uint32_t j = k >> 1; j > 0; j >>= 1) {
-                printf("stage %u,%u\n", k, j);
-            }
+    }
+    if (!gpuSort && (alwaysSort || cameraUpdated)) {
+        for (int32_t i = 0; i < numSplats; i++) {
+            Splat *splat = splats + i;
+            vec4 pos = {splat->pos[0], splat->pos[1], splat->pos[2], 1.0f};
+            glm_mat4_mulv(camera.viewProj, pos, transformedPos[i]);
         }
-        */
-
-        /*
-        uint32_t stages = 32 - __builtin_clz(n - 1); // ceil(log2(n))
-        for (uint32_t stage = 0; stage < stages; stage++) {
-            for (uint32_t pass = 0; pass <= stage; pass++) {
-                const uint32_t seqLen = 1u << (1u + stage);
-                const uint32_t cmpLen = seqLen >> (1u + pass);
-
-                SortUniform sortUniform = {
-                    .seqLen = seqLen,
-                    .cpmLen = cmpLen,
-                };
-                wgpuQueueWriteBuffer(queue, sortUniformBuffer, 0, &sortUniform, sizeof(sortUniform));
-
-                WGPUComputePassEncoder computePass = wgpuCommandEncoderBeginComputePass(encoder, NULL);
-                wgpuComputePassEncoderSetPipeline(computePass, sortPipeline);
-                wgpuComputePassEncoderSetBindGroup(computePass, 0, bindGroup, 0, NULL);
-                uint32_t workgroups = (numSplats + 255) / 256;
-                wgpuComputePassEncoderDispatchWorkgroups(computePass, workgroups, 1, 1);
-                wgpuComputePassEncoderEnd(computePass);
-
-
-#if 0
-                printf("stage %u,%u:\n", stage, pass);
-                printf("\tseqLen: %u\n", seqLen);
-                printf("\tcmpLen: %u\n", cmpLen);
-                for (uint32_t tId = 0; tId < n; tId++) {
-                    uint32_t xored = tId ^ cmpLen;
-                    if (xored > tId) {
-                        printf("\tthread %u\n", tId);
-                        printf("\t\ti: %u\n", tId);
-                        printf("\t\tj: %u\n", xored);
-                        printf("\t\tdir: %u\n", (tId & seqLen) == 0);
-                    }
-                }
-#endif
-
-            }
+        for (int i = 0; i < numSplats; i++) {
+            sortedIndex[i] = i;
         }
-        //exit(0);
-        */
+        qsort(sortedIndex, numSplats, sizeof(*sortedIndex), cmpTransformedPosZ);
 
+        wgpuQueueWriteBuffer(queue, transformedPosBuffer, 0, transformedPos, numSplats * sizeof(*transformedPos));
+        wgpuQueueWriteBuffer(queue, sortedIndexBuffer, 0, sortedIndex, numSplats * sizeof(*sortedIndex));
     }
     cameraUpdated = false;
 
@@ -556,6 +501,8 @@ void render(const AppState *app, float dt) {
         igSliderFloat("Splat size", &uniform.scale, 0.01f, 1.0f, "%.2f", 0);
         igSliderFloat3("Camera center", camera.center, -10.0f, 10.0f, "%.2f", 0);
         changeSplat = igCombo_Str("Splat file", &splatIdx, splatFiles[0], 0);
+        igCheckbox("GPU Sort", &gpuSort);
+        igCheckbox("Always Sort", &alwaysSort);
         igEnd();
 
         igRender();
