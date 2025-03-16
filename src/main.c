@@ -436,9 +436,12 @@ void loadSplat(const AppState *app, const char *splatFile) {
 
 void render(const AppState *app, float dt) {
     static bool cameraUpdated = true;
+#ifndef __EMSCRIPTEN__
+    // Cant exit on html
     if (inputIsKeyPressed(GLFW_KEY_ESCAPE)) {
         exit(0);
     }
+#endif
     bool mouseCaptured = igGetIO()->WantCaptureMouse;
     bool keyboardCaptured = igGetIO()->WantCaptureKeyboard;
     if (!mouseCaptured && inputIsButtonDown(GLFW_MOUSE_BUTTON_LEFT)) {
