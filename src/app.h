@@ -241,7 +241,11 @@ int main(int argc, const char **argv) {
         .device = state.device,
         .usage = WGPUTextureUsage_RenderAttachment,
         .format = state.format,
+#ifdef __EMSCRIPTEN__
         .presentMode = WGPUPresentMode_Fifo,
+#else
+        .presentMode = WGPUPresentMode_Immediate,
+#endif
         .alphaMode = WGPUCompositeAlphaMode_Auto,
         .width = config.width,
         .height = config.height,

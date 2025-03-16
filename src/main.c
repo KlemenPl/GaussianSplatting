@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "app.h"
 #include "camera.h"
@@ -434,7 +435,13 @@ void loadSplat(const AppState *app, const char *splatFile) {
     });
 }
 
+static double timeDiffSec(struct timespec start, struct timespec end) {
+    return (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) / 1000000000.0;
+}
+
 void render(const AppState *app, float dt) {
+    struct timespec sortStart, sortEnd;
+
     static bool cameraUpdated = true;
 #ifndef __EMSCRIPTEN__
     // Cant exit on html
@@ -487,6 +494,8 @@ void render(const AppState *app, float dt) {
 
     wgpuQueueWriteBuffer(queue, uniformBuffer, 0, &uniform, sizeof(uniform));
 
+    timespec_get(&sortStart, TIME_UTC);
+
     if (gpuSort && (alwaysSort || cameraUpdated)) {
         // Transform pass
         WGPUComputePassEncoder transformPass = wgpuCommandEncoderBeginComputePass(encoder, NULL);
@@ -526,6 +535,18 @@ void render(const AppState *app, float dt) {
             wgpuComputePassEncoderEnd(computePass);
             wgpuComputePassEncoderRelease(computePass);
         }
+
+
+        // Encode and submit
+        WGPUCommandBuffer command = wgpuCommandEncoderFinish(encoder, &(WGPUCommandBufferDescriptor) {
+            .nextInChain = NULL,
+            .label = "My Command Buffer",
+        });
+
+        wgpuQueueSubmit(queue, 1, &command);
+        wgpuCommandBufferRelease(command);
+        wgpuCommandEncoderRelease(encoder);
+        encoder = wgpuDeviceCreateCommandEncoder(app->device, &(WGPUCommandEncoderDescriptor) {});
     }
     if (!gpuSort && (alwaysSort || cameraUpdated)) {
         for (int32_t i = 0; i < numSplats; i++) {
@@ -543,6 +564,7 @@ void render(const AppState *app, float dt) {
     }
     cameraUpdated = false;
 
+    timespec_get(&sortEnd, TIME_UTC);
     // Render pass
     {
         WGPURenderPassEncoder renderPass = wgpuCommandEncoderBeginRenderPass(encoder, &(WGPURenderPassDescriptor) {
@@ -572,6 +594,7 @@ void render(const AppState *app, float dt) {
         //wgpuRenderPassEncoderSetVertexBuffer(renderPass, 0, vertexInBuffer, 0, wgpuBufferGetSize(vertexInBuffer));
         wgpuRenderPassEncoderDraw(renderPass, 4, numSplats, 0, 0);
 
+        double sortTime = timeDiffSec(sortStart, sortEnd) * 1000;
 
         igBegin("GaussianSplatting", NULL, 0);
         igSeparator();
@@ -592,6 +615,8 @@ void render(const AppState *app, float dt) {
         igCheckbox("Always Sort", &alwaysSort);
         igSeparator();
         igText("==========Performance==========");
+        igText("Frame time: %.2f ms", dt * 1000);
+        igText(" > Sort time: %.2f ms", sortTime);
         igEnd();
 
         igRender();
@@ -599,18 +624,21 @@ void render(const AppState *app, float dt) {
 
         wgpuRenderPassEncoderEnd(renderPass);
         wgpuRenderPassEncoderRelease(renderPass);
+
+
+        // Encode and submit
+        WGPUCommandBuffer command = wgpuCommandEncoderFinish(encoder, &(WGPUCommandBufferDescriptor) {
+            .nextInChain = NULL,
+            .label = "My Command Buffer",
+        });
+
+        wgpuQueueSubmit(queue, 1, &command);
+        wgpuCommandBufferRelease(command);
+
+        wgpuCommandEncoderRelease(encoder);
     }
 
-    // Encode and submit
-    WGPUCommandBuffer command = wgpuCommandEncoderFinish(encoder, &(WGPUCommandBufferDescriptor) {
-        .nextInChain = NULL,
-        .label = "My Command Buffer",
-    });
 
-    wgpuQueueSubmit(queue, 1, &command);
-    wgpuCommandBufferRelease(command);
-
-    wgpuCommandEncoderRelease(encoder);
 }
 
 AppConfig appMain() {
