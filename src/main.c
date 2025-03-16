@@ -37,7 +37,7 @@ _Static_assert(offsetof(SortUniform, comparePattern) == 0, "");
 
 ArcballCamera camera = CAMERA_ARCBALL_DEFAULT;
 
-const char *splatFiles[] = {"nike.splat", "plush.splat", "train.splat", ""};
+const char *splatFiles[] = {"nike.splat", "plush.splat", "train.splat"};
 
 uint32_t numSplats;
 
@@ -578,7 +578,16 @@ void render(const AppState *app, float dt) {
         igText("==========Config==========");
         igSliderFloat("Splat size", &uniform.scale, 0.01f, 1.0f, "%.2f", 0);
         igSliderFloat3("Camera center", camera.center, -10.0f, 10.0f, "%.2f", 0);
-        changeSplat = igCombo_Str("Splat file", &splatIdx, splatFiles[0], 0);
+        char comboBuf[256];
+        // Emscripten why cant you be normal :/
+        snprintf(comboBuf, sizeof(comboBuf), "%s", splatFiles[0]);
+        size_t len = strlen(comboBuf) + 1;  // +1 for the null terminator
+        snprintf(comboBuf + len, sizeof(comboBuf) - len, "%s", splatFiles[1]);
+        len += strlen(comboBuf + len) + 1;
+        snprintf(comboBuf + len, sizeof(comboBuf) - len, "%s", splatFiles[2]);
+        len += strlen(comboBuf + len) + 1;
+        comboBuf[len] = '\0';
+        changeSplat = igCombo_Str("Splat file", &splatIdx, comboBuf, 0);
         igCheckbox("GPU Sort", &gpuSort);
         igCheckbox("Always Sort", &alwaysSort);
         igSeparator();
