@@ -8,60 +8,21 @@ struct Splat {
 struct VertexOutput {
     @builtin(position) pos: vec4f,
     @location(0) @interpolate(perspective) offset: vec2f,
-    @location(1) scale: vec3f,
+    @location(1) @interpolate(flat) scale: vec3f,
     @location(2) @interpolate(flat) depth: f32,
-    @location(3) color: u32,
-    @location(4) rotation: u32,
+    @location(3) @interpolate(flat) color: u32,
+    @location(4) @interpolate(flat) rotation: u32,
 }
 
 struct Uniforms {
     viewProj: mat4x4<f32>,
     scale: f32,
 }
-struct SortUniforms {
-    @align(16) comparePattern: u32,
-}
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
-@group(0) @binding(1) var<uniform> sortUniforms: SortUniforms;
-@group(0) @binding(2) var<storage, read> splats: array<Splat>;
-@group(0) @binding(3) var<storage, read_write> transformedPos: array<vec4f>;
-@group(0) @binding(4) var<storage, read_write> sorted: array<u32>;
-
-
-@compute @workgroup_size(256)
-fn transform_main(@builtin(global_invocation_id) id: vec3u) {
-    if (id.x >= arrayLength(&splats)) {
-        return;
-    }
-    var splat = splats[id.x];
-    transformedPos[id.x] = uniforms.viewProj * vec4f(splat.pos, 1.0);
-    sorted[id.x] = id.x;
-}
-
-
-fn sort_cmp_and_swap(i: u32, j: u32) {
-    let n = arrayLength(&splats);
-    if (j >= n) {
-        return;
-    }
-    let iIdx = sorted[i];
-    let jIdx = sorted[j];
-    if (i < j && transformedPos[iIdx].z < transformedPos[jIdx].z) {
-        let tmp = sorted[i];
-        sorted[i] = sorted[j];
-        sorted[j] = tmp;
-    }
-}
-@compute @workgroup_size(256)
-fn sort_main(@builtin(global_invocation_id) id: vec3u) {
-    let i = id.x;
-    if (i >= arrayLength(&splats)) {
-        return;
-    }
-    let j = i ^ sortUniforms.comparePattern;
-    sort_cmp_and_swap(i, j);
-}
+@group(0) @binding(1) var<storage, read> splats: array<Splat>;
+@group(0) @binding(2) var<storage, read> transformedPos: array<vec4f>;
+@group(0) @binding(3) var<storage, read> sorted: array<u32>;
 
 
 @vertex

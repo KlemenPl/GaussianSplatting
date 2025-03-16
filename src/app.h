@@ -76,6 +76,7 @@ static void _wgpuOnDeviceError(WGPUErrorType type, const char *message, void *us
     }
 
     fprintf(stderr, "WGPU [%s]: %s\n", errorType, message);
+    raise(SIGINT);
 }
 
 
@@ -103,10 +104,7 @@ static bool _initWebGPU(AppState *state) {
     }
 
     state->device = requestDeviceSync(state->adapter, &(WGPUDeviceDescriptor){
-        .requiredFeatureCount = 1,
-        .requiredFeatures = (WGPUFeatureName[]){
-            WGPUNativeFeature_VertexWritableStorage
-        }
+        .requiredFeatureCount = 0,
     });
     if (state->device == NULL) {
         fprintf(stderr, "Failed to create WebGPU device\n");

@@ -43,13 +43,16 @@ uint32_t numSplats;
 
 WGPUQueue queue;
 
-WGPUBindGroup bindGroup;
+WGPUBindGroup computeBindGroup;
+WGPUBindGroup pipelineBindGroup;
+WGPUPipelineLayout computeLayout;
 WGPUPipelineLayout pipelineLayout;
 
 WGPUComputePipeline transformPipeline;
 WGPUComputePipeline sortPipeline;
 
-WGPUShaderModule shaderModule;
+WGPUShaderModule computeShaderModule;
+WGPUShaderModule renderShaderModule;
 WGPUBuffer uniformBuffer;
 WGPUBuffer sortUniformBuffer;
 WGPUBuffer stagingSortUniformBuffer;
@@ -77,17 +80,26 @@ int cmpTransformedPosZ(const void *a, const void *b) {
 int init(const AppState *app, int argc, const char **argv) {
     queue = wgpuDeviceGetQueue(app->device);
 
-    const char *shaderSource = readFile("shader.wgsl");
-    shaderModule = wgpuDeviceCreateShaderModule(app->device, &(WGPUShaderModuleDescriptor) {
+    const char *computeShader = readFile("assets/compute.wgsl");
+    computeShaderModule = wgpuDeviceCreateShaderModule(app->device, &(WGPUShaderModuleDescriptor) {
         .nextInChain = (WGPUChainedStruct*) &(WGPUShaderModuleWGSLDescriptor) {
             .chain = (WGPUChainedStruct) {
                 .next = NULL,
                 .sType = WGPUSType_ShaderModuleWGSLDescriptor,
             },
-            .code = shaderSource,
+            .code = computeShader,
         },
     });
-    free(shaderSource);
+    free(computeShader);
+    const char *renderShader = readFile("assets/render.wgsl");
+    renderShaderModule = wgpuDeviceCreateShaderModule(app->device, &(WGPUShaderModuleDescriptor) {
+        .nextInChain = (WGPUChainedStruct*) &(WGPUShaderModuleWGSLDescriptor) {
+            .chain.next = NULL,
+            .chain.sType = WGPUSType_ShaderModuleWGSLDescriptor,
+            .code = renderShader,
+        },
+    });
+    free(renderShader);
 
     uniformBuffer = wgpuDeviceCreateBuffer(app->device, &(WGPUBufferDescriptor) {
         .label = "Uniform Buffer",
@@ -108,8 +120,10 @@ int init(const AppState *app, int argc, const char **argv) {
     return 0;
 }
 void deinit(const AppState *app) {
-    wgpuBindGroupRelease(bindGroup);
+    wgpuBindGroupRelease(computeBindGroup);
+    wgpuBindGroupRelease(pipelineBindGroup);
     wgpuPipelineLayoutRelease(pipelineLayout);
+    wgpuPipelineLayoutRelease(computeLayout);
 
     free(splats);
     free(transformedPos);
@@ -122,7 +136,8 @@ void deinit(const AppState *app) {
     wgpuBufferRelease(transformedPosBuffer);
     wgpuBufferRelease(splatsBuffer);
 
-    wgpuShaderModuleRelease(shaderModule);
+    wgpuShaderModuleRelease(computeShaderModule);
+    wgpuShaderModuleRelease(renderShaderModule);
 
     wgpuComputePipelineRelease(transformPipeline);
     wgpuComputePipelineRelease(sortPipeline);
@@ -131,6 +146,9 @@ void deinit(const AppState *app) {
 }
 
 void loadSplat(const AppState *app, const char *splatFile) {
+    char buf[256];
+    snprintf(buf, sizeof(buf), "assets/%s", splatFile);
+    splatFile = buf;
     FILE *f = fopen(splatFile, "rb");
     if (!f) {
         fprintf(stderr, "Failed to open file %s\n", splatFile);
@@ -197,58 +215,69 @@ void loadSplat(const AppState *app, const char *splatFile) {
     });
     sortedIndex = malloc(numSplats * sizeof(uint32_t));
 
-    WGPUBindGroupLayout bindGroupLayout = wgpuDeviceCreateBindGroupLayout(app->device, &(WGPUBindGroupLayoutDescriptor) {
+    WGPUBindGroupLayout computeBindLayout = wgpuDeviceCreateBindGroupLayout(app->device, &(WGPUBindGroupLayoutDescriptor) {
         .entryCount = 5,
         .entries = (WGPUBindGroupLayoutEntry[]) {
             [0] = {
                 .binding = 0,
-                .visibility = WGPUShaderStage_Compute | WGPUShaderStage_Vertex,
-                .buffer = {
-                    .type = WGPUBufferBindingType_Uniform,
-                    .minBindingSize = sizeof(Uniform),
-                },
+                .visibility = WGPUShaderStage_Compute,
+                .buffer.type = WGPUBufferBindingType_Uniform,
             },
             [1] = {
                 .binding = 1,
                 .visibility = WGPUShaderStage_Compute,
-                .buffer = {
-                    .type = WGPUBufferBindingType_Uniform,
-                    .minBindingSize = sizeof(SortUniform),
-                }
+                .buffer.type = WGPUBufferBindingType_Uniform,
             },
             [2] = {
                 .binding = 2,
-                .visibility = WGPUShaderStage_Compute | WGPUShaderStage_Vertex,
-                .buffer = {
-                    .type = WGPUBufferBindingType_ReadOnlyStorage,
-                    .minBindingSize = wgpuBufferGetSize(splatsBuffer),
-                }
+                .visibility = WGPUShaderStage_Compute,
+                .buffer.type = WGPUBufferBindingType_ReadOnlyStorage,
             },
             [3] = {
                 .binding = 3,
-                .visibility = WGPUShaderStage_Compute | WGPUShaderStage_Vertex,
-                .buffer = {
-                    .type = WGPUBufferBindingType_Storage,
-                    .minBindingSize = wgpuBufferGetSize(transformedPosBuffer),
-                }
+                .visibility = WGPUShaderStage_Compute,
+                .buffer.type = WGPUBufferBindingType_Storage,
             },
             [4] = {
                 .binding = 4,
-                .visibility = WGPUShaderStage_Compute | WGPUShaderStage_Vertex,
-                .buffer = {
-                    .type = WGPUBufferBindingType_Storage,
-                    .minBindingSize = wgpuBufferGetSize(sortedIndexBuffer),
-                }
+                .visibility = WGPUShaderStage_Compute,
+                .buffer.type = WGPUBufferBindingType_Storage,
             },
-        },
-        .label = "Bind Group Layout",
+        }
     });
-
-    if (bindGroup) {
-        wgpuBindGroupRelease(bindGroup);
+    WGPUBindGroupLayout pipelineBindLayout = wgpuDeviceCreateBindGroupLayout(app->device, &(WGPUBindGroupLayoutDescriptor) {
+        .entryCount = 4,
+        .entries = (WGPUBindGroupLayoutEntry[]) {
+            [0] = {
+                .binding = 0,
+                .visibility = WGPUShaderStage_Vertex,
+                .buffer.type = WGPUBufferBindingType_Uniform,
+            },
+            [1] = {
+                .binding = 1,
+                .visibility = WGPUShaderStage_Vertex,
+                .buffer.type = WGPUBufferBindingType_ReadOnlyStorage,
+            },
+            [2] = {
+                .binding = 2,
+                .visibility = WGPUShaderStage_Vertex,
+                .buffer.type = WGPUBufferBindingType_ReadOnlyStorage,
+            },
+            [3] = {
+                .binding = 3,
+                .visibility = WGPUShaderStage_Vertex,
+                .buffer.type = WGPUBufferBindingType_ReadOnlyStorage,
+            }
+        }
+    });
+    if (computeBindGroup) {
+        wgpuBindGroupRelease(computeBindGroup);
     }
-    bindGroup = wgpuDeviceCreateBindGroup(app->device, &(WGPUBindGroupDescriptor) {
-        .layout = bindGroupLayout,
+    if (pipelineBindGroup) {
+        wgpuBindGroupRelease(pipelineBindGroup);
+    }
+    computeBindGroup = wgpuDeviceCreateBindGroup(app->device, &(WGPUBindGroupDescriptor) {
+        .layout = computeBindLayout,
         .entryCount = 5,
         .entries = (WGPUBindGroupEntry[]) {
             [0] = {
@@ -283,7 +312,51 @@ void loadSplat(const AppState *app, const char *splatFile) {
             }
 
         },
-        .label = "Bind Group",
+        .label = "Bind Group 0",
+    });
+    pipelineBindGroup = wgpuDeviceCreateBindGroup(app->device, &(WGPUBindGroupDescriptor) {
+        .layout = pipelineBindLayout,
+        .entryCount = 4,
+        .entries = (WGPUBindGroupEntry[]) {
+            [0] = {
+                .binding = 0,
+                .buffer = uniformBuffer,
+                .offset = 0,
+                .size = sizeof(Uniform),
+            },
+            [1] = {
+                .binding = 1,
+                .buffer = splatsBuffer,
+                .offset = 0,
+                .size = wgpuBufferGetSize(splatsBuffer),
+            },
+            [2] = {
+                .binding = 2,
+                .buffer = transformedPosBuffer,
+                .offset = 0,
+                .size = wgpuBufferGetSize(transformedPosBuffer),
+            },
+            [3] = {
+                .binding = 3,
+                .buffer = sortedIndexBuffer,
+                .offset = 0,
+                .size = wgpuBufferGetSize(sortedIndexBuffer),
+            }
+
+        },
+        .label = "Bind Group 1",
+    });
+
+    if (computeLayout) {
+        wgpuPipelineLayoutRelease(computeLayout);
+    }
+    computeLayout = wgpuDeviceCreatePipelineLayout(app->device, &(WGPUPipelineLayoutDescriptor) {
+        .bindGroupLayoutCount = 1,
+        .bindGroupLayouts = (WGPUBindGroupLayout[]) {
+            computeBindLayout,
+        },
+        .label = "Compute Pipeline",
+
     });
 
     if (pipelineLayout) {
@@ -292,19 +365,20 @@ void loadSplat(const AppState *app, const char *splatFile) {
     pipelineLayout = wgpuDeviceCreatePipelineLayout(app->device, &(WGPUPipelineLayoutDescriptor) {
         .bindGroupLayoutCount = 1,
         .bindGroupLayouts = (WGPUBindGroupLayout[]) {
-            bindGroupLayout,
+            pipelineBindLayout,
         },
         .label = "Pipeline Layout",
     });
-    wgpuBindGroupLayoutRelease(bindGroupLayout);
+    wgpuBindGroupLayoutRelease(computeBindLayout);
+    wgpuBindGroupLayoutRelease(pipelineBindLayout);
 
     if (transformPipeline) {
         wgpuComputePipelineRelease(transformPipeline);
     }
     transformPipeline = wgpuDeviceCreateComputePipeline(app->device, &(WGPUComputePipelineDescriptor) {
-        .layout = pipelineLayout,
+        .layout = computeLayout,
         .compute = {
-            .module = shaderModule,
+            .module = computeShaderModule,
             .entryPoint = "transform_main",
         }
     });
@@ -313,9 +387,9 @@ void loadSplat(const AppState *app, const char *splatFile) {
         wgpuComputePipelineRelease(sortPipeline);
     }
     sortPipeline = wgpuDeviceCreateComputePipeline(app->device, &(WGPUComputePipelineDescriptor) {
-        .layout = pipelineLayout,
+        .layout = computeLayout,
         .compute = {
-            .module = shaderModule,
+            .module = computeShaderModule,
             .entryPoint = "sort_main",
         }
     });
@@ -329,11 +403,11 @@ void loadSplat(const AppState *app, const char *splatFile) {
         .primitive.stripIndexFormat = WGPUIndexFormat_Undefined,
         .primitive.frontFace = WGPUFrontFace_CCW,
         .primitive.cullMode = WGPUCullMode_None,
-        .vertex.module = shaderModule,
+        .vertex.module = renderShaderModule,
         .vertex.bufferCount = 0,
         .vertex.entryPoint = "vs_main",
         .fragment = &(WGPUFragmentState) {
-            .module = shaderModule,
+            .module = renderShaderModule,
             .entryPoint = "fs_main",
             .targetCount = 1,
             .targets = (WGPUColorTargetState[]) {
@@ -414,7 +488,7 @@ void render(const AppState *app, float dt) {
         // Transform pass
         WGPUComputePassEncoder transformPass = wgpuCommandEncoderBeginComputePass(encoder, NULL);
         wgpuComputePassEncoderSetPipeline(transformPass, transformPipeline);
-        wgpuComputePassEncoderSetBindGroup(transformPass, 0, bindGroup, 0, NULL);
+        wgpuComputePassEncoderSetBindGroup(transformPass, 0, computeBindGroup, 0, NULL);
         wgpuComputePassEncoderDispatchWorkgroups(transformPass, (numSplats + 255) / 256, 1, 1);
         wgpuComputePassEncoderEnd(transformPass);
         wgpuComputePassEncoderRelease(transformPass);
@@ -443,7 +517,7 @@ void render(const AppState *app, float dt) {
             wgpuCommandEncoderCopyBufferToBuffer(encoder, stagingSortUniformBuffer, offset, sortUniformBuffer, 0, sizeof(SortUniform));
             WGPUComputePassEncoder computePass = wgpuCommandEncoderBeginComputePass(encoder, NULL);
             wgpuComputePassEncoderSetPipeline(computePass, sortPipeline);
-            wgpuComputePassEncoderSetBindGroup(computePass, 0, bindGroup, 0, NULL);
+            wgpuComputePassEncoderSetBindGroup(computePass, 0, computeBindGroup, 0, NULL);
             uint32_t workgroups = (numSplats + 255) / 256;
             wgpuComputePassEncoderDispatchWorkgroups(computePass, workgroups, 1, 1);
             wgpuComputePassEncoderEnd(computePass);
@@ -488,7 +562,7 @@ void render(const AppState *app, float dt) {
         });
 
         wgpuRenderPassEncoderSetPipeline(renderPass, renderPipeline);
-        wgpuRenderPassEncoderSetBindGroup(renderPass, 0, bindGroup, 0, NULL);
+        wgpuRenderPassEncoderSetBindGroup(renderPass, 0, pipelineBindGroup, 0, NULL);
         //wgpuRenderPassEncoderSetVertexBuffer(renderPass, 0, vertexInBuffer, 0, wgpuBufferGetSize(vertexInBuffer));
         wgpuRenderPassEncoderDraw(renderPass, 4, numSplats, 0, 0);
 

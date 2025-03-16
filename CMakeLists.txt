@@ -46,7 +46,6 @@ if (EMSCRIPTEN)
     # Generate a full web page rather than a simple WebAssembly module
     set_target_properties(GaussianSplatting PROPERTIES
             SUFFIX ".html"
-            LINK_FLAGS "-lidbfs.js -O3 --shell-file ../index.html -sFORCE_FILESYSTEM=1 -sWASM=1 -sUSE_GLFW=3 -sUSE_WEBGPU=1"
-
+            LINK_FLAGS "-lidbfs.js -g -gsource-map --shell-file ../index.html -sFORCE_FILESYSTEM=1 -sWASM=1 -sUSE_GLFW=3 -sUSE_WEBGPU=1 -sASYNCIFY --preload-file ../assets"
     )
 endif()
