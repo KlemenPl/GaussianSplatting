@@ -439,8 +439,8 @@ void render(const AppState *app, float dt) {
     if (inputIsKeyPressed(GLFW_KEY_ESCAPE)) {
         exit(0);
     }
-    bool mouseCaptured = igGetIO()->WantCaptureMouse;
-    bool keyboardCaptured = igGetIO()->WantCaptureKeyboard;
+    bool mouseCaptured = false && igGetIO()->WantCaptureMouse;
+    bool keyboardCaptured = false && igGetIO()->WantCaptureKeyboard;
     if (!mouseCaptured && inputIsButtonDown(GLFW_MOUSE_BUTTON_LEFT)) {
         const float mouseSpeed = 10.0f;
         vec2 mouseDelta;
@@ -555,10 +555,12 @@ void render(const AppState *app, float dt) {
                     .b = 1.0f,
                     .a = 1.0f
                 },
+#ifdef __EMSCRIPTEN__
+                    .depthSlice = WGPU_DEPTH_SLICE_UNDEFINED,
+#endif
             },
             .depthStencilAttachment = NULL,
             .timestampWrites = NULL,
-
         });
         //wgpuRenderPassEncoderSetViewport(renderPass, 0, 0, (float) app->config.width, (float) app->config.height, 0.0f, 1.0f);
 
@@ -567,7 +569,7 @@ void render(const AppState *app, float dt) {
         //wgpuRenderPassEncoderSetVertexBuffer(renderPass, 0, vertexInBuffer, 0, wgpuBufferGetSize(vertexInBuffer));
         wgpuRenderPassEncoderDraw(renderPass, 4, numSplats, 0, 0);
 
-
+/*
 
         igBegin("GaussianSplatting", NULL, 0);
         igSeparator();
@@ -583,6 +585,7 @@ void render(const AppState *app, float dt) {
 
         igRender();
         ImGui_ImplWGPU_RenderDrawData(igGetDrawData(), renderPass);
+        */
 
         wgpuRenderPassEncoderEnd(renderPass);
         wgpuRenderPassEncoderRelease(renderPass);

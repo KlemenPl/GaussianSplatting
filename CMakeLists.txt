@@ -17,7 +17,7 @@ set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 if (EMSCRIPTEN)
     add_library(glfw INTERFACE)
-    target_link_options(glfw INTERFACE -sUSE_GLFW=3)
+    target_link_options(glfw INTERFACE -sUSE_GLFW=3 -sUSE_WEBGPU)
 else ()
     add_subdirectory(libs/glfw3)
 endif ()
@@ -46,6 +46,6 @@ if (EMSCRIPTEN)
     # Generate a full web page rather than a simple WebAssembly module
     set_target_properties(GaussianSplatting PROPERTIES
             SUFFIX ".html"
-            LINK_FLAGS "-lidbfs.js -g -gsource-map -sASSERTIONS=1 --shell-file ../index.html -sFORCE_FILESYSTEM=1 -sWASM=1 -sUSE_GLFW=3 -sUSE_WEBGPU=1 -sASYNCIFY --preload-file ../assets"
+            LINK_FLAGS "-lidbfs.js -g -gseparate-dwarf -gsource-map -sASSERTIONS=3 --shell-file ../index.html -sFORCE_FILESYSTEM=1 -sWASM=1 -sALLOW_MEMORY_GROWTH -sSTACK_SIZE=10MB -sUSE_GLFW=3 -sUSE_WEBGPU -sASYNCIFY --preload-file ../assets"
     )
 endif()

@@ -12,5 +12,5 @@ emmake() {
     emscripten emmake "$@"
 }
 
-emcmake cmake -DPLATFORM=Web -DCMAKE_BUILD_TYPE=Release . -B build_web
+emcmake cmake -DPLATFORM=Web -DCMAKE_BUILD_TYPE=Debug . -B build_web
 emmake make -j $(nproc) -C build_web

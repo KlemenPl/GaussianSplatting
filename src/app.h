@@ -14,6 +14,7 @@
 #include <webgpu/wgpu.h>
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
+#include <emscripten/html5.h>
 #endif
 
 #include "input.h"
@@ -21,8 +22,6 @@
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 #include <glfw3webgpu.h>
-#include <webgpu/webgpu.h>
-#include <webgpu/webgpu.h>
 
 #include "imgui.h"
 
@@ -76,7 +75,7 @@ static void _wgpuOnDeviceError(WGPUErrorType type, const char *message, void *us
     }
 
     fprintf(stderr, "WGPU [%s]: %s\n", errorType, message);
-    //raise(SIGINT);
+    raise(SIGINT);
 }
 
 
@@ -114,8 +113,98 @@ static bool _initWebGPU(AppState *state) {
     return true;
 }
 
+
+char titleBuf[256];
+float prevFrame = 0.0f;
+float currFrame = 0.0f;
+
+AppState state;
+AppConfig config;
+
+
+static void mainLoop() {
+
+    // TODO: Accum for fixed update
+    float deltaTime = currFrame - prevFrame;
+    snprintf(titleBuf, sizeof(titleBuf), "%s [%.2f FPS | %.2f ms]", config.title, 1 / deltaTime, deltaTime * 1000.0f);
+    glfwSetWindowTitle(state.window, titleBuf);
+
+    inputUpdate();
+    glfwPollEvents();
+
+    int width, height;
+    glfwGetFramebufferSize(state.window, &width, &height);
+    if (width != state.config.width || height != state.config.height) {
+        state.config.width = width;
+        state.config.height = height;
+        //ImGui_ImplWGPU_InvalidateDeviceObjects();
+        wgpuSurfaceUnconfigure(state.surface);
+        wgpuSurfaceConfigure(state.surface, &state.config);
+        //ImGui_ImplWGPU_CreateDeviceObjects();
+    }
+
+    if (config.update) config.update(&state, deltaTime);
+
+    WGPUSurfaceTexture surfaceTexture;
+    wgpuSurfaceGetCurrentTexture(state.surface, &surfaceTexture);
+    switch (surfaceTexture.status) {
+        case WGPUSurfaceGetCurrentTextureStatus_Success:
+          // All good, could handle suboptimal here
+          break;
+        case WGPUSurfaceGetCurrentTextureStatus_Timeout:
+        case WGPUSurfaceGetCurrentTextureStatus_Outdated:
+        case WGPUSurfaceGetCurrentTextureStatus_Lost:
+        default: {
+            // Skip this frame, and re-configure surface.
+            if (surfaceTexture.texture != NULL) {
+                wgpuTextureRelease(surfaceTexture.texture);
+            }
+            int width, height;
+            glfwGetWindowSize(state.window, &width, &height);
+            if (width != 0 && height != 0) {
+                state.config.width = width;
+                state.config.height = height;
+                wgpuSurfaceConfigure(state.surface, &state.config);
+            }
+            return;
+        }
+
+    }
+    WGPUTextureView view = wgpuTextureCreateView(surfaceTexture.texture, &(WGPUTextureViewDescriptor){
+        .label = "Surface Texture View",
+        .format = wgpuTextureGetFormat(surfaceTexture.texture),
+        .dimension = WGPUTextureViewDimension_2D,
+        .baseMipLevel = 0,
+        .mipLevelCount = 1,
+        .baseArrayLayer = 0,
+        .arrayLayerCount = 1,
+        .aspect = WGPUTextureAspect_All,
+    });
+    state.view = view;
+
+    //ImGui_ImplWGPU_NewFrame();
+    //ImGui_ImplGlfw_NewFrame();
+    //igNewFrame();
+
+    if (config.render) config.render(&state, deltaTime);
+
+
+#ifndef __EMSCRIPTEN__
+    wgpuSurfacePresent(state.surface);
+#endif
+    wgpuTextureViewRelease(view);
+    wgpuTextureRelease(surfaceTexture.texture);
+
+#ifndef __EMSCRIPTEN__
+    wgpuDevicePoll(state.device, false, NULL);
+#endif
+
+    prevFrame = currFrame;
+    currFrame = glfwGetTime();
+}
+
 int main(int argc, const char **argv) {
-    AppConfig config = appMain();
+    config = appMain();
 
     glfwSetErrorCallback(_glfwErrorCallback);
     if (!glfwInit())
@@ -124,10 +213,7 @@ int main(int argc, const char **argv) {
     glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
     GLFWwindow *window = glfwCreateWindow(config.width, config.height, config.title, NULL, NULL);
 
-    AppState state = {
-        .window = window,
-    };
-
+    state.window = window;
     if (!_initWebGPU(&state)) {
         glfwTerminate();
         return 1;
@@ -139,13 +225,15 @@ int main(int argc, const char **argv) {
     WGPUSurfaceCapabilities surfaceCapabilities = {0};
     wgpuSurfaceGetCapabilities(state.surface, state.adapter, &surfaceCapabilities);
 
-    state.format = surfaceCapabilities.formats[0];
+    //state.format = surfaceCapabilities.formats[0];
+    WGPUTextureFormat format = wgpuSurfaceGetPreferredFormat(state.surface, state.adapter);
+    state.format = format;
     state.config = (WGPUSurfaceConfiguration) {
         .device = state.device,
         .usage = WGPUTextureUsage_RenderAttachment,
-        .format = surfaceCapabilities.formats[0],
-        .presentMode = WGPUPresentMode_Immediate,
-        .alphaMode = WGPUCompositeAlphaMode_Opaque,
+        .format = state.format,
+        .presentMode = WGPUPresentMode_Fifo,
+        .alphaMode = WGPUCompositeAlphaMode_Auto,
         .width = config.width,
         .height = config.height,
     };
@@ -155,6 +243,7 @@ int main(int argc, const char **argv) {
 
     inputInit(window);
 
+#if 0
 
     igCreateContext(NULL);
     ImGui_ImplGlfw_InitForOther(window, true);
@@ -171,6 +260,7 @@ int main(int argc, const char **argv) {
         }
     };
     ImGui_ImplWGPU_Init(&initInfo);
+#endif
 
 
     int status = 0;
@@ -179,75 +269,17 @@ int main(int argc, const char **argv) {
         fprintf(stderr, "Failed to initialize application!\n");
     }
 
-    char titleBuf[256];
-    float prevFrame = 0.0f;
-    float currFrame = 0.0f;
-    while (!glfwWindowShouldClose(window)) {
-        // TODO: Accum for fixed update
-        float deltaTime = currFrame - prevFrame;
-        snprintf(titleBuf, sizeof(titleBuf), "%s [%.2f FPS | %.2f ms]", config.title, 1 / deltaTime, deltaTime * 1000.0f);
-        glfwSetWindowTitle(window, titleBuf);
-        inputUpdate();
-        glfwPollEvents();
-
-        int width, height;
-        glfwGetFramebufferSize(window, &width, &height);
-        if (width != state.config.width || height != state.config.height) {
-            state.config.width = width;
-            state.config.height = height;
-            ImGui_ImplWGPU_InvalidateDeviceObjects();
-            wgpuSurfaceUnconfigure(state.surface);
-            wgpuSurfaceConfigure(state.surface, &state.config);
-            ImGui_ImplWGPU_CreateDeviceObjects();
-        }
-
-        if (config.update) config.update(&state, deltaTime);
-
-        WGPUSurfaceTexture surfaceTexture;
-        wgpuSurfaceGetCurrentTexture(state.surface, &surfaceTexture);
-        switch (surfaceTexture.status) {
-            case WGPUSurfaceGetCurrentTextureStatus_Success:
-              // All good, could handle suboptimal here
-              break;
-            case WGPUSurfaceGetCurrentTextureStatus_Timeout:
-            case WGPUSurfaceGetCurrentTextureStatus_Outdated:
-            case WGPUSurfaceGetCurrentTextureStatus_Lost: {
-                // Skip this frame, and re-configure surface.
-                if (surfaceTexture.texture != NULL) {
-                    wgpuTextureRelease(surfaceTexture.texture);
-                }
-                int width, height;
-                glfwGetWindowSize(window, &width, &height);
-                if (width != 0 && height != 0) {
-                    state.config.width = width;
-                    state.config.height = height;
-                    wgpuSurfaceConfigure(state.surface, &state.config);
-                }
-                continue;
-            }
-
-        }
-        WGPUTextureView view = wgpuTextureCreateView(surfaceTexture.texture, NULL);
-        state.view = view;
-
-        ImGui_ImplWGPU_NewFrame();
-        ImGui_ImplGlfw_NewFrame();
-        igNewFrame();
-
-        if (config.render) config.render(&state, deltaTime);
-
-
-        wgpuSurfacePresent(state.surface);
-        wgpuTextureViewRelease(view);
-        wgpuTextureRelease(surfaceTexture.texture);
 
 #ifndef __EMSCRIPTEN__
-        wgpuDevicePoll(state.device, false, NULL);
-#endif
-
-        prevFrame = currFrame;
-        currFrame = glfwGetTime();
+    while (!glfwWindowShouldClose(window)) {
+        // TODO: Accum for fixed update
+        mainLoop();
     }
+#else
+    emscripten_set_main_loop(mainLoop, 0, true);
+    // No clean up on HTML5
+    return 0;
+#endif
 
     if (config.deinit)
         config.deinit(&state);
