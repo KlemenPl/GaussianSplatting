@@ -79,11 +79,12 @@ int init(const AppState *app, int argc, const char **argv) {
 
     const char *shaderSource = readFile("shader.wgsl");
     shaderModule = wgpuDeviceCreateShaderModule(app->device, &(WGPUShaderModuleDescriptor) {
-        .nextInChain = (WGPUChainedStruct*) &(WGPUShaderSourceWGSL) {
+        .nextInChain = (WGPUChainedStruct*) &(WGPUShaderModuleWGSLDescriptor) {
             .chain = (WGPUChainedStruct) {
-                .sType = WGPUSType_ShaderSourceWGSL,
+                .next = NULL,
+                .sType = WGPUSType_ShaderModuleWGSLDescriptor,
             },
-            .code = {shaderSource, strlen(shaderSource)},
+            .code = shaderSource,
         },
     });
     free(shaderSource);
@@ -304,7 +305,7 @@ void loadSplat(const AppState *app, const char *splatFile) {
         .layout = pipelineLayout,
         .compute = {
             .module = shaderModule,
-            .entryPoint = {"transform_main", WGPU_STRLEN},
+            .entryPoint = "transform_main",
         }
     });
 
@@ -315,7 +316,7 @@ void loadSplat(const AppState *app, const char *splatFile) {
         .layout = pipelineLayout,
         .compute = {
             .module = shaderModule,
-            .entryPoint = {"sort_main", WGPU_STRLEN},
+            .entryPoint = "sort_main",
         }
     });
 
@@ -330,10 +331,10 @@ void loadSplat(const AppState *app, const char *splatFile) {
         .primitive.cullMode = WGPUCullMode_None,
         .vertex.module = shaderModule,
         .vertex.bufferCount = 0,
-        .vertex.entryPoint = {"vs_main", WGPU_STRLEN},
+        .vertex.entryPoint = "vs_main",
         .fragment = &(WGPUFragmentState) {
             .module = shaderModule,
-            .entryPoint = {"fs_main", WGPU_STRLEN},
+            .entryPoint = "fs_main",
             .targetCount = 1,
             .targets = (WGPUColorTargetState[]) {
                 [0].format = app->format,
@@ -480,7 +481,6 @@ void render(const AppState *app, float dt) {
                     .b = 1.0f,
                     .a = 1.0f
                 },
-                .depthSlice = WGPU_DEPTH_SLICE_UNDEFINED,
             },
             .depthStencilAttachment = NULL,
             .timestampWrites = NULL,
@@ -495,11 +495,15 @@ void render(const AppState *app, float dt) {
 
 
         igBegin("GaussianSplatting", NULL, 0);
+        igSeparator();
+        igText("==========Config==========");
         igSliderFloat("Splat size", &uniform.scale, 0.01f, 1.0f, "%.2f", 0);
         igSliderFloat3("Camera center", camera.center, -10.0f, 10.0f, "%.2f", 0);
         changeSplat = igCombo_Str("Splat file", &splatIdx, splatFiles[0], 0);
         igCheckbox("GPU Sort", &gpuSort);
         igCheckbox("Always Sort", &alwaysSort);
+        igSeparator();
+        igText("==========Performance==========");
         igEnd();
 
         igRender();

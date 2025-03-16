@@ -105,7 +105,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
     let offset = sqrt(dot(in.offset, in.offset));
     let sigma = 1 / in.depth; // (s / z) ^ (-1)
     let gaus = exp(-0.5 * offset * offset * sigma);
-    let finalAlpha = gaus * a;
+    let finalAlpha = color.a * gaus;
 
 
     return vec4f(color.rgb,  finalAlpha);

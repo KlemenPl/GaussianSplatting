@@ -8,19 +8,8 @@ add_compile_options(-Wall -pedantic)
 
 add_subdirectory(libs/cglm)
 add_subdirectory(libs/webgpu)
+add_subdirectory(libs/glfw3webgpu)
 include(libs/cimgui.cmake)
-
-if (WIN32)
-    add_definitions(-DGLFW_EXPOSE_NATIVE_WIN32)
-    set(OS_LIBRARIES d3dcompiler ws2_32 userenv bcrypt ntdll opengl32 Propsys RuntimeObject)
-elseif(UNIX AND NOT APPLE AND NOT EMSCRIPTEN)
-    add_definitions(-DGLFW_EXPOSE_NATIVE_X11)
-    add_definitions(-DGLFW_EXPOSE_NATIVE_WAYLAND)
-    set(OS_LIBRARIES "-lm -ldl")
-elseif(APPLE)
-    add_definitions(-DGLFW_EXPOSE_NATIVE_COCOA)
-    set(OS_LIBRARIES "-framework CoreFoundation -framework QuartzCore -framework Metal")
-endif()
 
 # GLFW library
 set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
@@ -42,11 +31,13 @@ add_executable(GaussianSplatting
         src/main.c
         src/utils.c
         src/utils.h
-        src/wgpu-utils.c
-        src/wgpu-utils.h
+        src/webgpu-utils.c
+        src/webgpu-utils.h
 )
 
-target_link_libraries(GaussianSplatting PRIVATE webgpu cglm glfw ${OS_LIBRARIES})
+target_compile_options(GaussianSplatting PRIVATE -Wall -Wextra -pedantic)
+
+target_link_libraries(GaussianSplatting PRIVATE webgpu cglm glfw glfw3webgpu)
 target_link_libraries(GaussianSplatting PRIVATE ${CIMGUI_LIBRARY})
 target_compile_definitions(GaussianSplatting PRIVATE CIMGUI_USE_GLFW CIMGUI_USE_WGPU)
 target_copy_webgpu_binaries(GaussianSplatting)

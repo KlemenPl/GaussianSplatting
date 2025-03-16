@@ -10,31 +10,23 @@
 #include <stdio.h>
 #include <signal.h>
 
+#include <webgpu/webgpu.h>
+#include <webgpu/wgpu.h>
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
+
 #include "input.h"
 
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
-#ifndef __EMSCRIPTEN__
-#include <GLFW/glfw3native.h>
-#endif
+#include <glfw3webgpu.h>
 #include <webgpu/webgpu.h>
-
-#ifdef __EMSCRIPTEN__
-typedef struct WGPUSwapChain WGPUSwapChain;
-typedef struct WGPUSurfaceDescriptorFromCanvasHTMLSelector {
-    WGPUChainedStruct chain;
-    char const * selector;
-} WGPUSurfaceDescriptorFromCanvasHTMLSelector WGPU_STRUCTURE_ATTRIBUTE;
-#define WGPUSType_SurfaceDescriptorFromCanvasHTMLSelector 0x00000004
-#include <emscripten.h>
-#include <emscripten/html5.h>
-#include <emscripten/html5_webgpu.h>
-#endif
-
-#include "wgpu-utils.h"
+#include <webgpu/webgpu.h>
 
 #include "imgui.h"
 
+#include "webgpu-utils.h"
 
 typedef struct AppState {
     GLFWwindow *window;
@@ -65,157 +57,43 @@ typedef struct AppConfig {
 
 #ifndef APP_NO_MAIN
 
-#include <webgpu/webgpu.h>
-#include <webgpu/wgpu.h>
-
-#include <GLFW/glfw3.h>
-
 extern AppConfig appMain();
 
 static void _glfwErrorCallback(int error, const char *description) {
     fprintf(stderr, "GLFW error %d: %s\n", error, description);
 }
 
-static void _wgpuLogCallback(WGPULogLevel level, WGPUStringView message, void *userdata) {
-    const char *logLevel = "Unknown";
-    switch (level) {
-        case WGPULogLevel_Error: logLevel = "ERROR"; break;
-        case WGPULogLevel_Warn:  logLevel = "WARN"; break;
-        case WGPULogLevel_Info:  logLevel = "INFO"; break;
-        case WGPULogLevel_Debug: logLevel = "DEBUG"; break;
-        case WGPULogLevel_Trace: logLevel = "TRACE"; break;
+static void _wgpuOnDeviceError(WGPUErrorType type, const char *message, void *userdata) {
+    const char *errorType = "Unknown";
+    switch (type) {
+        case WGPUErrorType_NoError: errorType = "No error"; break;
+        case WGPUErrorType_Validation: errorType = "Validation"; break;
+        case WGPUErrorType_OutOfMemory: errorType = "OutOfMemory"; break;
+        case WGPUErrorType_Internal: errorType = "Internal"; break;
+        case WGPUErrorType_Unknown: errorType = "Unknown"; break;
+        case WGPUErrorType_Force32: errorType = "Force32"; break;
         default: break;
     }
 
-    fprintf(stderr, "WGPU [%s]: %s\n", logLevel, message);
-    if (level < WGPULogLevel_Warn) {
-        raise(SIGTRAP);
-    }
-
+    fprintf(stderr, "WGPU [%s]: %s\n", errorType, message);
 }
 
 
 static bool _initWebGPU(AppState *state) {
-#ifdef WEBGPU_BACKEND_EMSCRIPTEN
     state->instance = wgpuCreateInstance(NULL);
-#else
-    state->instance = wgpuCreateInstance(NULL);
-#endif
     if (state->instance == NULL) {
         fprintf(stderr, "Failed to create WebGPU instance\n");
         return false;
     }
 
-
-    #if defined(GLFW_EXPOSE_NATIVE_COCOA)
-  {
-    id metal_layer = NULL;
-    NSWindow *ns_window = glfwGetCocoaWindow(window);
-    [ns_window.contentView setWantsLayer:YES];
-    metal_layer = [CAMetalLayer layer];
-    [ns_window.contentView setLayer:metal_layer];
-    demo.surface = wgpuInstanceCreateSurface(
-        demo.instance,
-        &(const WGPUSurfaceDescriptor){
-            .nextInChain =
-                (const WGPUChainedStruct *)&(
-                    const WGPUSurfaceSourceMetalLayer){
-                    .chain =
-                        (const WGPUChainedStruct){
-                            .sType = WGPUSType_SurfaceSourceMetalLayer,
-                        },
-                    .layer = metal_layer,
-                },
-        });
-  }
-#elif defined(GLFW_EXPOSE_NATIVE_WAYLAND) && defined(GLFW_EXPOSE_NATIVE_X11)
-  if (glfwGetPlatform() == GLFW_PLATFORM_X11) {
-    Display *x11_display = glfwGetX11Display();
-    Window x11_window = glfwGetX11Window(state->window);
-    state->surface = wgpuInstanceCreateSurface(
-        state->instance,
-        &(const WGPUSurfaceDescriptor){
-            .nextInChain =
-                (const WGPUChainedStruct *)&(
-                    const WGPUSurfaceSourceXlibWindow){
-                    .chain =
-                        (const WGPUChainedStruct){
-                            .sType = WGPUSType_SurfaceSourceXlibWindow,
-                        },
-                    .display = x11_display,
-                    .window = x11_window,
-                },
-        });
-  }
-  if (false && glfwGetPlatform() == GLFW_PLATFORM_WAYLAND) {
-    struct wl_display *wayland_display = glfwGetWaylandDisplay();
-    struct wl_surface *wayland_surface = glfwGetWaylandWindow(state->window);
-    state->surface = wgpuInstanceCreateSurface(
-        state->instance,
-        &(const WGPUSurfaceDescriptor){
-            .nextInChain =
-                (const WGPUChainedStruct *)&(
-                    const WGPUSurfaceSourceWaylandSurface){
-                    .chain =
-                        (const WGPUChainedStruct){
-                            .sType =
-                                WGPUSType_SurfaceSourceWaylandSurface,
-                        },
-                    .display = wayland_display,
-                    .surface = wayland_surface,
-                },
-        });
-  }
-#elif defined(GLFW_EXPOSE_NATIVE_WIN32)
-  {
-    HWND hwnd = glfwGetWin32Window(window);
-    HINSTANCE hinstance = GetModuleHandle(NULL);
-    demo.surface = wgpuInstanceCreateSurface(
-        demo.instance,
-        &(const WGPUSurfaceDescriptor){
-            .nextInChain =
-                (const WGPUChainedStruct *)&(
-                    const WGPUSurfaceSourceWindowsHWND){
-                    .chain =
-                        (const WGPUChainedStruct){
-                            .sType = WGPUSType_SurfaceSourceWindowsHWND,
-                        },
-                    .hinstance = hinstance,
-                    .hwnd = hwnd,
-                },
-        });
-  }
-#elif defined(__EMSCRIPTEN__)
-      // For Emscripten/Web, we use the HTML canvas
-  //EmscriptenWebGPUContextAttributes attrs;
-  //attrs.powerPreference = EM_WEBGPU_POWER_PREFERENCE_HIGH_PERFORMANCE;
-  //attrs.failIfMajorPerformanceCaveat = false;
-
-  //EMSCRIPTEN_WEBGPU_CONTEXT_HANDLE context = emscripten_webgpu_create_context("canvas", &attrs);
-
-  //WGPUDevice device = emscripten_webgpu_get_device();
-
-  // Create surface from canvas
-  state->surface = wgpuInstanceCreateSurface(
-      state->instance,
-      &(WGPUSurfaceDescriptor){
-          .nextInChain = (WGPUChainedStruct*)&(WGPUSurfaceDescriptorFromCanvasHTMLSelector){
-              .chain = {
-                  .sType = WGPUSType_SurfaceDescriptorFromCanvasHTMLSelector,
-              },
-              .selector = "#canvas", // The ID of your canvas element
-          },
-      });
-#else
-#error "Unsupported GLFW native platform"
-#endif
+    state->surface = glfwGetWGPUSurface(state->instance, state->window);
     if (state->surface == NULL) {
         fprintf(stderr, "Failed to create GLFW window surface\n");
         return false;
     }
 
-    state->adapter = requestAdapter(state->instance, &(WGPURequestAdapterOptions){
-        .backendType = WGPUBackendType_Vulkan,
+    state->adapter = requestAdapterSync(state->instance, &(WGPURequestAdapterOptions){
+        .backendType = WGPUBackendType_Undefined,
         .powerPreference = WGPUPowerPreference_HighPerformance,
         .compatibleSurface = state->surface,
     });
@@ -224,17 +102,16 @@ static bool _initWebGPU(AppState *state) {
         return false;
     }
 
-    state->device = requestDevice(state->adapter, &(WGPUDeviceDescriptor){
+    state->device = requestDeviceSync(state->adapter, &(WGPUDeviceDescriptor){
         .requiredFeatureCount = 1,
         .requiredFeatures = (WGPUFeatureName[]){
-        WGPUNativeFeature_VertexWritableStorage
+            WGPUNativeFeature_VertexWritableStorage
         }
     });
     if (state->device == NULL) {
         fprintf(stderr, "Failed to create WebGPU device\n");
         return false;
     }
-
 
     return true;
 }
@@ -253,14 +130,13 @@ int main(int argc, const char **argv) {
         .window = window,
     };
 
-#ifndef __EMSCRIPTEN__
-    wgpuSetLogLevel(WGPULogLevel_Info);
-    wgpuSetLogCallback(_wgpuLogCallback, NULL);
-#endif
     if (!_initWebGPU(&state)) {
         glfwTerminate();
         return 1;
     }
+    inspectAdapter(state.adapter);
+    inspectDevice(state.device);
+    wgpuDeviceSetUncapturedErrorCallback(state.device, _wgpuOnDeviceError, NULL);
 
     WGPUSurfaceCapabilities surfaceCapabilities = {0};
     wgpuSurfaceGetCapabilities(state.surface, state.adapter, &surfaceCapabilities);
@@ -271,7 +147,7 @@ int main(int argc, const char **argv) {
         .usage = WGPUTextureUsage_RenderAttachment,
         .format = surfaceCapabilities.formats[0],
         .presentMode = WGPUPresentMode_Immediate,
-        .alphaMode = surfaceCapabilities.alphaModes[0],
+        .alphaMode = WGPUCompositeAlphaMode_Opaque,
         .width = config.width,
         .height = config.height,
     };
@@ -332,8 +208,7 @@ int main(int argc, const char **argv) {
         WGPUSurfaceTexture surfaceTexture;
         wgpuSurfaceGetCurrentTexture(state.surface, &surfaceTexture);
         switch (surfaceTexture.status) {
-            case WGPUSurfaceGetCurrentTextureStatus_SuccessOptimal:
-            case WGPUSurfaceGetCurrentTextureStatus_SuccessSuboptimal:
+            case WGPUSurfaceGetCurrentTextureStatus_Success:
               // All good, could handle suboptimal here
               break;
             case WGPUSurfaceGetCurrentTextureStatus_Timeout:
