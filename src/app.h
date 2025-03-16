@@ -76,7 +76,7 @@ static void _wgpuOnDeviceError(WGPUErrorType type, const char *message, void *us
     }
 
     fprintf(stderr, "WGPU [%s]: %s\n", errorType, message);
-    raise(SIGINT);
+    //raise(SIGINT);
 }
 
 
@@ -121,7 +121,7 @@ int main(int argc, const char **argv) {
     if (!glfwInit())
         return 1;
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+    glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
     GLFWwindow *window = glfwCreateWindow(config.width, config.height, config.title, NULL, NULL);
 
     AppState state = {
@@ -192,9 +192,9 @@ int main(int argc, const char **argv) {
 
         int width, height;
         glfwGetFramebufferSize(window, &width, &height);
-        if (width != config.width || height != config.height) {
-            config.width = width;
-            config.height = height;
+        if (width != state.config.width || height != state.config.height) {
+            state.config.width = width;
+            state.config.height = height;
             ImGui_ImplWGPU_InvalidateDeviceObjects();
             wgpuSurfaceUnconfigure(state.surface);
             wgpuSurfaceConfigure(state.surface, &state.config);

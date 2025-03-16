@@ -560,6 +560,7 @@ void render(const AppState *app, float dt) {
             .timestampWrites = NULL,
 
         });
+        //wgpuRenderPassEncoderSetViewport(renderPass, 0, 0, (float) app->config.width, (float) app->config.height, 0.0f, 1.0f);
 
         wgpuRenderPassEncoderSetPipeline(renderPass, renderPipeline);
         wgpuRenderPassEncoderSetBindGroup(renderPass, 0, pipelineBindGroup, 0, NULL);
