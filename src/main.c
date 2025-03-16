@@ -465,9 +465,6 @@ void render(const AppState *app, float dt) {
     }
     cameraUpdated = false;
 
-    //printf("%ld %ld %ld\n", wgpuBufferGetSize(vertexBuffer), wgpuBufferGetSize(vertexInBuffer), 4 * numSplats * sizeof(SplatVertex));
-    //wgpuCommandEncoderCopyBufferToBuffer(encoder, vertexBuffer, 0, vertexInBuffer, 0, wgpuBufferGetSize(vertexBuffer));
-
     // Render pass
     {
         WGPURenderPassEncoder renderPass = wgpuCommandEncoderBeginRenderPass(encoder, &(WGPURenderPassDescriptor) {
@@ -522,31 +519,6 @@ void render(const AppState *app, float dt) {
     wgpuCommandBufferRelease(command);
 
     wgpuCommandEncoderRelease(encoder);
-
-
-#if 0
-
-    size_t posSize = wgpuBufferGetSize(transformedPosBuffer);
-    size_t indicesSize = wgpuBufferGetSize(sortedIndexBuffer);
-    if (!stagingBuffer) {
-        stagingBuffer = wgpuDeviceCreateBuffer(app->device, &(WGPUBufferDescriptor) {
-            .usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_MapRead,
-            .size = posSize + indicesSize,
-            .mappedAtCreation = false,
-        });
-    }
-
-    if (!stagingMapped) {
-        encoder = wgpuDeviceCreateCommandEncoder(app->device, NULL);
-        wgpuCommandEncoderCopyBufferToBuffer(encoder, transformedPosBuffer, 0, stagingBuffer, 0, posSize);
-        wgpuCommandEncoderCopyBufferToBuffer(encoder, sortedIndexBuffer, 0, stagingBuffer, posSize, indicesSize);
-        WGPUCommandBuffer commands = wgpuCommandEncoderFinish(encoder, NULL);
-        wgpuQueueSubmit(queue, 1, &commands);
-        wgpuBufferMapAsync(stagingBuffer, WGPUMapMode_Read, 0, posSize + indicesSize, mapBuffer, NULL);
-        stagingMapped = true;
-    }
-#endif
-
 }
 
 AppConfig appMain() {
