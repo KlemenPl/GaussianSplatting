@@ -439,8 +439,8 @@ void render(const AppState *app, float dt) {
     if (inputIsKeyPressed(GLFW_KEY_ESCAPE)) {
         exit(0);
     }
-    bool mouseCaptured = false && igGetIO()->WantCaptureMouse;
-    bool keyboardCaptured = false && igGetIO()->WantCaptureKeyboard;
+    bool mouseCaptured = igGetIO()->WantCaptureMouse;
+    bool keyboardCaptured = igGetIO()->WantCaptureKeyboard;
     if (!mouseCaptured && inputIsButtonDown(GLFW_MOUSE_BUTTON_LEFT)) {
         const float mouseSpeed = 10.0f;
         vec2 mouseDelta;
@@ -569,7 +569,6 @@ void render(const AppState *app, float dt) {
         //wgpuRenderPassEncoderSetVertexBuffer(renderPass, 0, vertexInBuffer, 0, wgpuBufferGetSize(vertexInBuffer));
         wgpuRenderPassEncoderDraw(renderPass, 4, numSplats, 0, 0);
 
-/*
 
         igBegin("GaussianSplatting", NULL, 0);
         igSeparator();
@@ -585,7 +584,6 @@ void render(const AppState *app, float dt) {
 
         igRender();
         ImGui_ImplWGPU_RenderDrawData(igGetDrawData(), renderPass);
-        */
 
         wgpuRenderPassEncoderEnd(renderPass);
         wgpuRenderPassEncoderRelease(renderPass);

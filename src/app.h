@@ -137,10 +137,10 @@ static void mainLoop() {
     if (width != state.config.width || height != state.config.height) {
         state.config.width = width;
         state.config.height = height;
-        //ImGui_ImplWGPU_InvalidateDeviceObjects();
+        ImGui_ImplWGPU_InvalidateDeviceObjects();
         wgpuSurfaceUnconfigure(state.surface);
         wgpuSurfaceConfigure(state.surface, &state.config);
-        //ImGui_ImplWGPU_CreateDeviceObjects();
+        ImGui_ImplWGPU_CreateDeviceObjects();
     }
 
     if (config.update) config.update(&state, deltaTime);
@@ -182,9 +182,9 @@ static void mainLoop() {
     });
     state.view = view;
 
-    //ImGui_ImplWGPU_NewFrame();
-    //ImGui_ImplGlfw_NewFrame();
-    //igNewFrame();
+    ImGui_ImplWGPU_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    igNewFrame();
 
     if (config.render) config.render(&state, deltaTime);
 
@@ -243,8 +243,6 @@ int main(int argc, const char **argv) {
 
     inputInit(window);
 
-#if 0
-
     igCreateContext(NULL);
     ImGui_ImplGlfw_InitForOther(window, true);
     igStyleColorsDark(NULL);
@@ -260,7 +258,6 @@ int main(int argc, const char **argv) {
         }
     };
     ImGui_ImplWGPU_Init(&initInfo);
-#endif
 
 
     int status = 0;
